@@ -63,7 +63,7 @@ def vigen(calc_op, li_calc, resapply, geonode, connode, simnode, geogennode, tar
     res = [li_calc(calc_op, simnode, connode, geonode, vi_func.livisimacc(simnode, connode), genframe = scene.frame_current)]
 
     for ob in vi_func.retobjs('livic'):        
-        ob['licalc'] = vi_func.gentarget(tarnode, ob['oreslist']['{}'.format(scene.frame_current)]) 
+         
         livicgeos = vi_func.retobjs('livic')
         if ob.get('licalc') == 1:
             vi_func.selobj(scene, ob)
@@ -71,6 +71,7 @@ def vigen(calc_op, li_calc, resapply, geonode, connode, simnode, geogennode, tar
             ob.keyframe_insert(data_path='["licalc"]', frame = scene.frame_current + 1)
         else:
             ob.manip = 0
+        ob['licalc'] = vi_func.gentarget(tarnode, ob['oreslist']['{}'.format(scene.frame_current)])
     
     for ob in manipobs:
         if ob.manip == 1 and geogennode.geomenu == 'Mesh':  
@@ -135,7 +136,7 @@ def vigen(calc_op, li_calc, resapply, geonode, connode, simnode, geogennode, tar
     for frame in vi_func.framerange(scene, 'Animation'):
         scene.frame_set(frame)
         for geo in manipobs:
-            if geogennode.geomenu == 'Mesh':
+            if geogennode.geomenu == 'Mesh' and geo.data.shape_keys:
                 for shape in geo.data.shape_keys.key_blocks:
                     if "Basis" not in shape.name:
                         shape.value = 1 if shape.name == 'gen-{}'.format(frame) else 0
