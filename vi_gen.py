@@ -17,9 +17,7 @@ def vigen(calc_op, li_calc, resapply, geonode, connode, simnode, geogennode, tar
         elif geogennode.oselmenu == 'Selected':   
             manipobs = [ob for ob in vi_func.retobjs('livig') if ob.select == True and ob not in vi_func.retobjs('livic')]
         else:
-            manipobs = [ob for ob in vi_func.retobjs('livig') if ob.select == False and ob not in vi_func.retobjs('livic')]
-#        for ob in vi_func.retobjs('livig'):
-            
+            manipobs = [ob for ob in vi_func.retobjs('livig') if ob.select == False and ob not in vi_func.retobjs('livic')]   
     
     elif geogennode.geomenu == 'Mesh':  
         if geogennode.oselmenu == 'All':
@@ -30,9 +28,7 @@ def vigen(calc_op, li_calc, resapply, geonode, connode, simnode, geogennode, tar
             manipobs = [ob for ob in vi_func.retobjs('livig') if ob.select == False] 
        
         for ob in manipobs:
-#            ob.manip = 1
             vi_func.selobj(scene, ob)
-
             bpy.ops.object.mode_set(mode = 'EDIT')
             if ob.vertex_groups.get('genfaces'):            
                 bpy.ops.mesh.select_all(action='SELECT')
@@ -112,17 +108,17 @@ def vigen(calc_op, li_calc, resapply, geonode, connode, simnode, geogennode, tar
                 if ob['licalc'] == 1 and ob.manip == 1 and geogennode.geomenu == 'Mesh':
                     bpy.ops.object.shape_key_add(from_mix = False)
                     ob.active_shape_key.name = 'gen-' + str(scene.frame_current)
-                
-                
                     modgeo(ob, geogennode, scene, scene.frame_current, scene.frame_start)   
-        
-#                    if ob.manip == 1 and geogennode.geomenu == 'Mesh':
                     for shape in ob.data.shape_keys.key_blocks:
                         if "Basis" not in shape.name:
                             shape.value = 1 if shape.name == 'gen-{}'.format(scene.frame_current) else 0
-                            shape.keyframe_insert("value")
-    
-            radgexport(calc_op, geonode, genframe = scene.frame_current)
+                            shape.keyframe_insert("value")                
+                elif ob.manip == 1 and geogennode.geomenu == 'Object':
+                    modgeo(ob, geogennode, scene, scene.frame_current, scene.frame_start)
+                    ob.keyframe_insert(('location', 'rotation_euler', 'scale')[int(geogennode.omanmenu)])
+                    
+                    
+            radgexport(calc_op, geonode, genframe = scene.frame_current, mo = manipobs)
             res.append(li_calc(calc_op, simnode, connode, geonode, vi_func.livisimacc(simnode, connode), genframe = scene.frame_current))
             
             for ob in vi_func.retobjs('livic'):

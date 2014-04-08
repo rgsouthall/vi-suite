@@ -100,6 +100,7 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
                 with open(os.path.join(geonode.newdir, resname+"-"+str(frame)+".res"), 'w') as resfile:
                     for l,line in enumerate(rtrun.stdout):
                         if 'octree' in line.decode() or 'mesh' in line.decode():
+                            print(line.decode())
                             resfile.close()
                             radfexport(scene, calc_op, connode, geonode, frames)
                             if kwargs.get('genframe'):

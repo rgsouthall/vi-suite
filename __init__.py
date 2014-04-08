@@ -97,9 +97,8 @@ def confunc(i):
 (bricklist, stonelist, metallist, woodlist, gaslist, glasslist, concretelist, insullist, wgaslist, claddinglist) = [matfunc(i) for i in range(10)]
 (wallconlist, floorconlist, roofconlist, doorconlist, glazeconlist) = [confunc(i) for i in range(5)]
 
-
 def eupdate(self, context):
-    inv = 0# if context.scene.resnode == 'VI Shadow Study' else 1        
+    inv = 0        
     for frame in range(context.scene.frame_start, context.scene.frame_end + 1):
         for o in [obj for obj in bpy.data.objects if obj.lires == 1]:
             if str(frame) in o['omax'].keys():

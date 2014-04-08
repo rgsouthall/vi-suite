@@ -67,7 +67,8 @@ def radgexport(export_op, node, **kwargs):
         # Geometry export routine
 
         radfile += "# Geometry \n\n"
-        for o in retobjs('livig'):
+        obs = retobjs('livig') if not kwargs.get('manipobs') else kwargs['manipobs']
+        for o in obs:
             o.select = True
             if o.get('merr') != 1:
                 if node.animmenu == 'Geometry':# or export_op.nodeid.split('@')[0] == 'LiVi Simulation':
@@ -379,10 +380,12 @@ def fexport(scene, frame, export_op, node, othernode):
     bpy.data.texts['Radiance input-{}'.format(frame)].write(radtext)
     
     oconvcmd = "oconv -w {0}-{1}.rad > {0}-{1}.oct".format(geonode.filebase, frame)
+    
 #    This next line allows the radiance scene description to be piped into the oconv command.
 #   oconvcmd = "oconv -w - > {0}-{1}.oct".format(geonode.filebase, frame).communicate(input = radtext.encode('utf-8'))
-    Popen(oconvcmd, shell = True, stdin = PIPE, stdout=PIPE, stderr=STDOUT)#.communicate(input = radtext.encode('utf-8'))
-    
+    oconvrun = Popen(oconvcmd, shell = True, stdin = PIPE, stdout=PIPE, stderr=STDOUT)#.communicate(input = radtext.encode('utf-8'))
+    for line in oconvrun.stdout:
+        print(line.decode())
     export_op.report({'INFO'},"Export is finished")
 
 def cyfc1(self):
