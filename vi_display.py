@@ -17,7 +17,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 
-import bpy, blf, colorsys, bgl, mathutils
+import bpy, blf, colorsys, bgl, mathutils, math
 try:
     import matplotlib
     mp = 1
@@ -141,7 +141,7 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
         obreslist = [ob for ob in scene.objects if ob.type == 'MESH'  and 'lightarray' not in ob.name and ob.hide == False and ob.layers[scene.active_layer] == True and ob.get('licalc') == 1 and ob.lires == 1]
         obcalclist = [ob for ob in scene.objects if ob.type == 'MESH' and 'lightarray' not in ob.name and ob.hide == False and ob.layers[scene.active_layer] == True and ob.get('licalc') == 1 and ob.lires == 0]
 
-    if (scene.li_disp_panel != 2 and scene.ss_disp_panel != 2) or scene.vi_display_rp != True \
+    if (scene.li_disp_panel != 2 and scene.ss_disp_panel != 2) or scene.vi_display_rp != True or not context.space_data.region_3d.is_perspective \
          or (bpy.context.active_object not in (obcalclist+obreslist) and scene.vi_display_sel_only == True)  \
          or scene.frame_current not in range(scene.fs, scene.fe + 1) or (bpy.context.active_object and bpy.context.active_object.mode == 'EDIT'):
         return
@@ -171,8 +171,7 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
         obm = ob.data
         ob_mat = ob.matrix_world
         view_mat = context.space_data.region_3d.perspective_matrix
-        view_pos = (view_mat.inverted()[0][3]/5, view_mat.inverted()[1][3]/5, view_mat.inverted()[2][3]/5)
-
+        view_pos = [vmi*scene['cs']*2 for vmi in (view_mat.inverted()[0][3], view_mat.inverted()[1][3], view_mat.inverted()[2][3])]
         if cp == "0" or not geonode:
             faces = [f for f in ob.data.polygons if f.select == True] if ob.lires else [f for f in ob.data.polygons if ob.data.materials[f.material_index].vi_shadow] if simnode.bl_label == 'VI Shadow Study' else [f for f in ob.data.polygons if f.select == True] if ob.lires else [f for f in ob.data.polygons if ob.data.materials[f.material_index].livi_sense]
             if scene.vi_display_vis_only:
@@ -312,7 +311,7 @@ def viwr_legend(self, context, simnode):
         bgl.glLineWidth(1)
         bgl.glDisable(bgl.GL_BLEND)
         height = context.region.height
-        font_id = 0:
+        font_id = 0
         bgl.glColor4f(0.0, 0.0, 0.0, 0.8)
         blf.size(font_id, 20, 48)
         vi_func.drawfont("Ave: {:.1f}".format(simnode['avres']), font_id, 0, height, 22, simnode['nbins']*20 + 85)
@@ -534,6 +533,8 @@ def rendview(i):
                                 space.show_textured_solid = 1
                             else:
                                 space.show_textured_solid = 0
+                            space.clip_start = 0.1
+                            bpy.context.scene['cs'] = space.clip_start
 
 
 

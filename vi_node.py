@@ -112,13 +112,12 @@ class ViLiNode(bpy.types.Node, ViNodes):
         self.bl_label = '*LiVi Basic'
         self.outputs['Target out'].hide = True if self.animmenu != 'Static' else False
         if self.analysismenu == '2' or self.skymenu not in ('0', '1', '2'):
-            self.needloc = 0
+#            self.needloc = 0
             if self.inputs['Location in'].is_linked:
                 bpy.data.node_groups[self['nodeid'].split('@')[1]].links.remove(self.inputs['Location in'].links[0])
-                self.inputs['Location in'].hide = True
+            self.inputs['Location in'].hide = True
         else:
             self.inputs['Location in'].hide = False
-            self.needloc = 1
         if int(self.skymenu) < 4:
             self.skytypeparams = ("+s", "+i", "-c", "-b 22.86 -c")[int(self.skymenu)]
         self.skynum = int(self.skymenu) if self.analysismenu != "2" else 3
@@ -205,7 +204,7 @@ class ViLiNode(bpy.types.Node, ViNodes):
         if self.skymenu != '6':
             newrow(layout, 'HDR:', self, 'hdr')
         
-        if self.inputs['Geometry in'].is_linked and ((self.needloc and self.inputs['Location in'].is_linked) or not self.needloc):
+        if self.inputs['Geometry in'].is_linked and ((self.inputs['Location in'].is_linked and not self.inputs['Location in'].hide) or self.inputs['Location in'].hide):
             row = layout.row()
             row.operator("node.liexport", text = "Export").nodeid = self['nodeid']
 

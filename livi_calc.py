@@ -30,7 +30,7 @@ except:
 
 def radfexport(scene, export_op, connode, geonode, frames):
     for frame in frames:
-        livi_export.fexport(scene, frame, export_op, connode, geonode)
+        livi_export.fexport(scene, frame, export_op, connode, geonode, pause = 1)
 
 def rad_prev(prev_op, simnode, connode, geonode, simacc):
     scene = bpy.context.scene
@@ -50,7 +50,6 @@ def rad_prev(prev_op, simnode, connode, geonode, simacc):
             rvurun = Popen(rvucmd, shell = True, stdout=PIPE, stderr=STDOUT)
             for l,line in enumerate(rvurun.stdout):
                 if 'octree' in line.decode() or 'mesh' in line.decode():
-                    print(line.decode())
                     radfexport(scene, prev_op, connode, geonode, [scene.frame_current])
                     rad_prev(prev_op, simnode, connode, geonode, simacc)
                     return
@@ -100,7 +99,6 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
                 with open(os.path.join(geonode.newdir, resname+"-"+str(frame)+".res"), 'w') as resfile:
                     for l,line in enumerate(rtrun.stdout):
                         if 'octree' in line.decode() or 'mesh' in line.decode():
-                            print(line.decode())
                             resfile.close()
                             radfexport(scene, calc_op, connode, geonode, frames)
                             if kwargs.get('genframe'):
@@ -220,7 +218,7 @@ def resapply(calc_op, res, svres, simnode, connode, geonode):
     scene = bpy.context.scene    
     if connode.analysismenu != '3' or connode.bl_label != 'LiVi CBDM':
         if np == 1:
-            simnode['maxres'] = [numpy.amax(res[i]) for i in range(scene.fs, scene.fe + 1)]
+            simnode['maxres'] = list([numpy.amax(res[i]) for i in range(scene.fs, scene.fe + 1)])
             simnode['minres'] = [numpy.amin(res[i]) for i in range(scene.fs, scene.fe + 1)]
             simnode['avres'] = [numpy.average(res[i]) for i in range(scene.fs, scene.fe + 1)]
         else:

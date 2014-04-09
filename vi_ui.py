@@ -122,46 +122,6 @@ class VIMatPanel(bpy.types.Panel):
         
         radname, matname, radnum = radmat(cm, context.scene)
         row.label(radname.capitalize())
-#        if cm.use_shadeless == True:
-#            row.label('Anti-matter')
-#        elif cm.emit > 0:
-#            row.label('Emission')
-#            row = layout.row()
-#            row.label('RGB emission:')
-#            row.label('({:.2f}, {:.2f}, {:.2f})'.format(cm.emit * cm.diffuse_color[0], cm.emit * cm.diffuse_color[1], cm.emit * cm.diffuse_color[2]))
-#        elif cm.raytrace_mirror.use == True and cm.raytrace_mirror.reflect_factor > 0.99:
-#            row.label('Mirror')
-#            row = layout.row()
-#            row.label('RGB refelectance:')
-#            row.label('({:.2f}, {:.2f}, {:.2f})'.format(*cm.mirror_color))
-#        elif cm.use_transparency == True and cm.transparency_method == 'RAYTRACE' and cm.alpha < 1.0 and cm.translucency == 0:
-#            row.label('Glass')
-#            row = layout.row()
-#            row.label('RGB transparency:')
-#            row.label('({:.2f}, {:.2f}, {:.2f})'.format((1.0 - cm.alpha)*cm.diffuse_color[0], (1.0 - cm.alpha)*cm.diffuse_color[1], (1.0 - cm.alpha)*cm.diffuse_color[2]))
-#            row = layout.row()
-#            row.label('IOR:')
-#            row.label('{:.2f}'.format(cm.raytrace_transparency.ior))
-#        elif cm.use_transparency == True and cm.transparency_method == 'RAYTRACE' and cm.alpha < 1.0 and cm.translucency > 0:
-#            for matprop in ('Translucent', 0, 'RGB transmission:', '({:.2f}, {:.2f}, {:.2f})'.format(*cm.diffuse_color), 0, 'Specularity', '{:.2f}'.format(cm.specular_intensity), 0, 'Roughness:', '{:.2f}'.format(1.0-cm.specular_hardness/511.0), 0, 'Transmissivity', '{:.2f}'.format(1.0 - cm.alpha), 0, 'Transmitted Specular', '{:.2f}'.format(1.0 - cm.translucency)):
-#                if matprop:
-#                    row.label(matprop)  
-#                else:
-#                    row = layout.row()
-#
-#        elif cm.raytrace_mirror.use == True and cm.raytrace_mirror.reflect_factor <= 0.99:
-#            for matprop in ('Metal', 0, 'RGB refelectance:', '({:.2f}, {:.2f}, {:.2f})'.format(*cm.diffuse_color), 0, 'Specularity', '{:.2f}'.format(cm.specular_intensity), 0, 'Roughness:', '{:.2f}'.format(1.0-cm.specular_hardness/511.0)):
-#                if matprop:
-#                    row.label(matprop) 
-#                else:
-#                    row = layout.row()
-#        else:
-#            for matprop in ('Plastic', 0, 'RGB refelectance:', '({:.2f}, {:.2f}, {:.2f})'.format(*cm.diffuse_color), 0, 'Specularity', '{:.2f}'.format(cm.specular_intensity), 0, 'Roughness:', '{:.2f}'.format(1.0-cm.specular_hardness/511.0)):
-#                if matprop:
-#                    row.label(matprop) 
-#                else:
-#                    row = layout.row()
-
         layout = self.layout
         row = layout.row()
         row.label("-----------------------------------------")

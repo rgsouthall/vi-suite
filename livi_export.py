@@ -73,19 +73,18 @@ def radgexport(export_op, node, **kwargs):
             selobj(scene, o)
             if o.get('merr') != 1:
                 if node.animmenu == 'Geometry':# or export_op.nodeid.split('@')[0] == 'LiVi Simulation':
-                    bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=True, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=True, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
+                    bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
                     objcmd = "obj2mesh -w -a {} {} {}".format(retmat(frame, node), retobj(o.name, scene.frame_current, node), retmesh(o.name, scene.frame_current, node))
                     objrun = Popen(objcmd, shell = True, stdout = PIPE)                
                 elif export_op.nodeid.split('@')[0] == 'LiVi Simulation':
-                    bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_start, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=True, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=True, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
+                    bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_start, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
                     objcmd = "obj2mesh -w -a {} {} {}".format(retmat(scene.frame_start, node), retobj(o.name, scene.frame_start, node), retmesh(o.name, scene.frame_start, node))
                     objrun = Popen(objcmd, shell = True, stdout = PIPE)
                 else:
                     if frame == scene.fs:                        
-                        bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=True, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=True, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
+                        bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
                         objcmd = "obj2mesh -w -a {} {} {}".format(retmat(frame, node), retobj(o.name, scene.frame_current, node), retmesh(o.name, scene.frame_current, node))
                         objrun = Popen(objcmd, shell = True, stdout = PIPE)
-
                 for line in objrun.stdout:
                     if 'fatal' in str(line):
                         print('Mesh export error: '+ line)
@@ -364,7 +363,8 @@ def skyexport(node, rad_sky):
 def hdrsky(skyfile):
     return("# Sky material\nvoid colorpict hdr_env\n7 red green blue {} angmap.cal sb_u sb_v\n0\n0\n\nhdr_env glow env_glow\n0\n0\n4 1 1 1 0\n\nenv_glow bubble sky\n0\n0\n4 0 0 0 5000\n\n".format(skyfile))
 
-def fexport(scene, frame, export_op, node, othernode):
+def fexport(scene, frame, export_op, node, othernode, **kwargs):
+    pt = 0.1 if not kwargs.get('pause') else 1
     (geonode, connode) = (node, othernode) if 'LiVi Geometry' in node.bl_label else (othernode, node)
     if not connode or not connode.get('Animation'):
         radtext = geonode['radfiles'][0] if len(geonode['radfiles']) == 1 else geonode['radfiles'][frame]
@@ -384,9 +384,13 @@ def fexport(scene, frame, export_op, node, othernode):
     
 #    This next line allows the radiance scene description to be piped into the oconv command.
 #   oconvcmd = "oconv -w - > {0}-{1}.oct".format(geonode.filebase, frame).communicate(input = radtext.encode('utf-8'))
+    ti.sleep(1)
     oconvrun = Popen(oconvcmd, shell = True, stdin = PIPE, stdout=PIPE, stderr=STDOUT)#.communicate(input = radtext.encode('utf-8'))
+
     for line in oconvrun.stdout:
-        print(line.decode())
+        if 'incompatible' in line.decode():
+            export_op.report({'ERROR'},"Incompatible mesh format. Try increasing the sleep period in ti.sleep in the livi_export.py file")
+    ti.sleep(1)
     export_op.report({'INFO'},"Export is finished")
 
 def cyfc1(self):
