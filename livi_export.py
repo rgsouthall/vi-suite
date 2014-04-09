@@ -22,7 +22,7 @@ from math import sin, cos, tan, pi
 from mathutils import Vector
 from subprocess import PIPE, Popen, STDOUT
 from .vi_func import retsky, retmat, retobj, retmesh, clearscene, \
-solarPosition, mtx2vals, retobjs, radmat
+solarPosition, mtx2vals, retobjs, radmat, selobj
 
 try:
     import numpy
@@ -67,9 +67,10 @@ def radgexport(export_op, node, **kwargs):
         # Geometry export routine
 
         radfile += "# Geometry \n\n"
-        obs = retobjs('livig') if not kwargs.get('manipobs') else kwargs['manipobs']
+        # The comment below should limit geometry export to only changing geometry when doing a generative analysis, but doesn't work
+        obs = retobjs('livig')# if not kwargs.get('mo') else kwargs['mo']
         for o in obs:
-            o.select = True
+            selobj(scene, o)
             if o.get('merr') != 1:
                 if node.animmenu == 'Geometry':# or export_op.nodeid.split('@')[0] == 'LiVi Simulation':
                     bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=True, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=True, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')

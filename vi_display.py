@@ -267,10 +267,11 @@ def li3D_legend(self, context, simnode, connode, geonode):
                 findex = scene.frame_current - scene.frame_start if simnode['Animation'] != 'Static' else 0
                 bgl.glColor4f(0.0, 0.0, 0.0, 0.8)
                 blf.size(font_id, 20, 48)
-                if context.active_object and context.active_object.get('lires') == 1 or context.active_object.get('licalc'):
-                    vi_func.drawfont("Ave: {:.1f}".format(context.active_object['oave'][str(scene.frame_current)]), font_id, 0, height, 22, 480)
-                    vi_func.drawfont("Max: {:.1f}".format(context.active_object['omax'][str(scene.frame_current)]), font_id, 0, height, 22, 495)
-                    vi_func.drawfont("Min: {:.1f}".format(context.active_object['omin'][str(scene.frame_current)]), font_id, 0, height, 22, 510)
+                if context.active_object:
+                    if context.active_object.get('lires') or context.active_object.get('licalc'):
+                        vi_func.drawfont("Ave: {:.1f}".format(context.active_object['oave'][str(scene.frame_current)]), font_id, 0, height, 22, 480)
+                        vi_func.drawfont("Max: {:.1f}".format(context.active_object['omax'][str(scene.frame_current)]), font_id, 0, height, 22, 495)
+                        vi_func.drawfont("Min: {:.1f}".format(context.active_object['omin'][str(scene.frame_current)]), font_id, 0, height, 22, 510)
                 else:
                     vi_func.drawfont("Ave: {:.1f}".format(simnode['avres'][findex]), font_id, 0, height, 22, 480)
                     vi_func.drawfont("Max: {:.1f}".format(simnode['maxres'][findex]), font_id, 0, height, 22, 495)
@@ -311,8 +312,7 @@ def viwr_legend(self, context, simnode):
         bgl.glLineWidth(1)
         bgl.glDisable(bgl.GL_BLEND)
         height = context.region.height
-        font_id = 0
-#        if context.scene.frame_current in range(scene.fs, scene.fe + 1):
+        font_id = 0:
         bgl.glColor4f(0.0, 0.0, 0.0, 0.8)
         blf.size(font_id, 20, 48)
         vi_func.drawfont("Ave: {:.1f}".format(simnode['avres']), font_id, 0, height, 22, simnode['nbins']*20 + 85)

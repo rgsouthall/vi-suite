@@ -635,7 +635,6 @@ class ViExEnNode(bpy.types.Node, ViNodes):
     resihl = bpy.props.BoolProperty(name = "Heat loss (W)", description = "Ventilation Heat Loss (W)", default = False, update = nodeexported)
     resl12ms = bpy.props.BoolProperty(name = u'Flow (m\u00b3/s)', description = u'Linkage flow (m\u00b3/s)', default = False, update = nodeexported)
     reslof = bpy.props.BoolProperty(name = 'Opening factor', description = 'Linkage Opening Factor', default = False, update = nodeexported)
-
     
     def init(self, context):
         self.inputs.new('ViEnG', 'Geometry in')
@@ -672,9 +671,6 @@ class ViExEnNode(bpy.types.Node, ViNodes):
         if all([s.is_linked for s in self.inputs]) and self.inputs['Location in'].links[0].from_node.loc == '1':
             row = layout.row()
             row.operator("node.enexport", text = 'Export').nodeid = self['nodeid']
-
-#            if self.exported == True and self.inputs['Geometry in'].links[0].from_node.exported == True:
-#                self.outputs['Context out'].hide = False
                 
 class ViEnSimNode(bpy.types.Node, ViNodes):
     '''Node describing an EnergyPlus simulation'''
@@ -737,37 +733,6 @@ class ViEnRFNode(bpy.types.Node, ViNodes):
         row = layout.row()
         row.prop(self, 'resfilename')
         row.operator("node.fileprocess", text = 'Process file').nodeid = self['nodeid']
-
-
-#class ViEnRNode(bpy.types.Node, ViNodes):
-#    '''Node for EnergyPlus 2D results analysis'''
-#    bl_idname = 'ViEnRNode'
-#    bl_label = 'VI EnergyPLus results'
-#
-#    ctypes = [("0", "Line", "Line Chart"), ("1", "Bar", "Bar Chart")]
-#    dsh = bpy.props.IntProperty(name = "Start", description = "", min = 1, max = 24, default = 1)
-#    deh = bpy.props.IntProperty(name = "End", description = "", min = 1, max = 24, default = 24)
-#    charttype = bpy.props.EnumProperty(items = ctypes, name = "Chart Type", default = "0")
-#    timemenu = bpy.props.EnumProperty(items=[("0", "Hourly", "Hourly results"),("1", "Daily", "Daily results"), ("2", "Monthly", "Monthly results")],
-#                                                      name="", description="Results frequency", default="0")
-#
-#
-#    class ViEnRXIn(bpy.types.NodeSocket):
-#        '''Energy geometry out socket'''
-#        bl_idname = 'ViEnRXIn'
-#        bl_label = 'X-axis'
-#
-#        def draw_color(self, context, node):
-#            return (0.0, 1.0, 0.0, 0.75)
-#        def draw(self, context, layout, node, text):
-#            row = layout.row()
-#
-#    def init(self, context):
-#
-#        self.inputs.new("ViEnRXIn", "X-axis")
-#        self['Start'] = 1
-#        self['End'] = 365
-
 
 class ViEnRNode(bpy.types.Node, ViNodes):
     '''Node for 2D results plotting'''
@@ -1074,11 +1039,6 @@ class ViEnRNode(bpy.types.Node, ViNodes):
                 
                 bpy.utils.register_class(ViEnRY3In)
 
-        
-        
-        
-        
-
 class ViNodeCategory(NodeCategory):
     @classmethod
     def poll(cls, context):
@@ -1203,20 +1163,6 @@ class ViEnC(bpy.types.NodeSocket):
 
     def color(self):
         return (0.0, 1.0, 1.0, 0.75)
-
-#class ViEnGIn(bpy.types.NodeSocket):
-#    '''Energy geometry out socket'''
-#    bl_idname = 'ViEnGIn'
-#    bl_label = 'Geometry in'
-#
-#    def draw(self, context, layout, node, text):
-#        layout.label(text)
-#
-#    def draw_color(self, context, node):
-#        return (0.0, 0.0, 1.0, 0.75)
-#
-#    def color(self):
-#        return (0.0, 0.0, 1.0, 0.75)
 
 class EnViDataIn(bpy.types.NodeSocket):
     '''EnVi data in socket'''

@@ -229,11 +229,8 @@ def resapply(calc_op, res, svres, simnode, connode, geonode):
             simnode['avres'] = [sum(res[i])/len(res[i]) for i in range(scene.fs, scene.fe + 1)]
     
         crits = []
-    #    fs, fc = scene.frame_start, scene.frame_current
         dfpass = [0 for f in range(scene.fs, scene.fe + 1)]
-    #    frames = vi_func.framerange(scene, simnode['Animation'])
-    #    frameisg = frameis if not gen else range(gen, gen + 1)
-    #    
+        
         for fr, frame in enumerate(range(scene.fs, scene.fe + 1)):
             scene.frame_set(frame)
             fi = 0
@@ -274,12 +271,10 @@ def resapply(calc_op, res, svres, simnode, connode, geonode):
                                 col_i = cvtup.index(v)
                             lcol_i.append(col_i)
                             vertexColour.data[loop_index].color = rgb[col_i+mcol_i]
-#                            weightres = res
         
                     if geonode.cpoint == '0':
                         for loop_index in face.loop_indices:
                             vertexColour.data[loop_index].color = rgb[fi]
-#                            weightres += vi_func.triarea(geo, face) * res[frame][fi]/geoarea
                         fi += 1
 
                 if connode.bl_label == 'LiVi Compliance':
@@ -305,8 +300,7 @@ def resapply(calc_op, res, svres, simnode, connode, geonode):
 
                     if fr == 0:
                         crit, ecrit = [], []
-                        comps, ecomps =  [[[] * f for f in range(scene.fs, scene.fe + 1)] for x in range(2)]
-#                            ecomps = [[] * f for f in range(scene.frame_start, scene.frame_end+1)]
+                        comps, ecomps =  [[[] * fra for fra in range(scene.fs, scene.fe + 1)] for x in range(2)]
 
                         if connode.analysismenu == '0':
                             ecrit = []
@@ -495,16 +489,6 @@ def resapply(calc_op, res, svres, simnode, connode, geonode):
                                 comps[frame].append(sum(res[frame][fstart:fend])/(fend - fstart))
                                 dftotarea += geoarea
 
-#                            elif c[2] == 'PDF':
-#                                dfpass[frame] = 1
-#                                if sum(svres[frame][fstart:fend])/(fend - fstart) > c[3]:
-#                                    dfpassarea += geoarea
-#                                    comps[frame].append(1)
-#                                else:
-#                                    comps[frame].append(0)
-#                                comps[frame].append(sum(svres[frame][fstart:fend])/(fend -fstart))
-#                                dftotarea += geoarea
-
                             elif c[2] == 'Skyview':
                                 for fa, face in enumerate(geofaces):
                                    if svres[frame][fa + fstart] > 0:
@@ -540,28 +524,13 @@ def resapply(calc_op, res, svres, simnode, connode, geonode):
                     for e in ecrit:
                         if e[0] == 'Percent':
                             if e[2] == 'DF':
-#                                r = res if e[2] == 'DF' else svres
                                 dfpass[frame] = 1
                                 if sum(res[frame][fstart:fend])/(fend - fstart) > e[3]:
                                     dfpassarea += geoarea
-#                                            ecomps[frame].append(1)
-#                                        else:
-#                                            ecomps[frame].append(0)
+
                                 ecomps[frame].append((0, 1)[sum(res[frame][fstart:fend])/(fend - fstart) > e[3]])
                                 ecomps[frame].append(sum(res[frame][fstart:fend])/(fend - fstart))
                                 edftotarea += geoarea
-
-
-#                                    elif e[2] == 'PDF':
-#                                        dfpass[frame] = 1
-#                                        if sum(svres[frame][fstart:fend])/(fend - fstart) > e[3]:
-#                                            dfpassarea += geoarea
-#                                            ecomps[frame].append(1)
-#                                        else:
-#                                            ecomps[frame].append(0)
-#                                        ecomps[frame].append(sum(svres[frame][fstart:fend])/(fend - fstart))
-#                                        edftotarea += geoarea
-
 
                             elif e[2] == 'Skyview':
                                 for fa, face in enumerate(geofaces):
@@ -608,7 +577,6 @@ def resapply(calc_op, res, svres, simnode, connode, geonode):
                 dfpass[frame] = 2 if dfpassarea/dftotarea >= 0.8 else dfpass[frame]
             scene['crits'] = crits
             scene['dfpass'] = dfpass
-#        scene['dfpass'] = 2 if dfpassarea/dftotarea >= 0.8 else scene['dfpass']
         simnode.outputs['Data out'].hide = True
     else:
         for fr, frame in enumerate(range(scene.fs, scene.fe + 1)):
