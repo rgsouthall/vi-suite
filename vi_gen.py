@@ -102,7 +102,8 @@ def vigen(calc_op, li_calc, resapply, geonode, connode, simnode, geogennode, tar
                             
         if scene.frame_current > scene.frame_start:              
             for ob in manipobs:
-                ob.keyframe_insert(data_path='["licalc"]')
+                if ob.get('licalc'):
+                    ob.keyframe_insert(data_path='["licalc"]')
                 vi_func.selobj(scene, ob)  
                 if ob.manip == 1 and geogennode.geomenu == 'Mesh':
                     bpy.ops.object.shape_key_add(from_mix = False)

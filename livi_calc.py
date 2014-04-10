@@ -186,26 +186,29 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
                     obcalcverts, obres = [], []
                     weightres = 0
                     geoarea = sum([vi_func.triarea(geo, face) for face in geo.data.polygons if geo.data.materials[face.material_index].livi_sense])
-                    for face in [face for face in geo.data.polygons if geo.data.materials[face.material_index].livi_sense]:
-                        if geonode.cpoint == '1':
-                            for v,vert in enumerate(face.vertices):
-                                if geo.data.vertices[vert] not in obcalcverts:
-                                    weightres += res[findex][vi] 
-                                    obres.append(res[findex][vi])
-                                    obcalcverts.append(geo.data.vertices[vert])
-                                    vi += 1
-                        else:
-                            weightres += vi_func.triarea(geo, face) * res[findex][fi]/geoarea
-                            obres.append(res[findex][fi])
-                            fi += 1
-        
-                    if (frame == scene.fs and not kwargs.get('genframe')) or (kwargs.get('genframe') and kwargs['genframe'] == scene.frame_start):
-                        geo['oave'], geo['omax'], geo['omin'], geo['oreslist'] = {}, {}, {}, {}
-                    
-                    geo['oave'][str(frame)] = weightres
-                    geo['omax'][str(frame)] = max(obres)
-                    geo['omin'][str(frame)] = min(obres)
-                    geo['oreslist'][str(frame)] = obres 
+                    if not geoarea:
+                        calc_op.report({'INFO'}, geo.name+" has a livi sensor material associated with, but not assigned to any faces")
+                    else: 
+                        for face in [face for face in geo.data.polygons if geo.data.materials[face.material_index].livi_sense]:
+                            if geonode.cpoint == '1':
+                                for v,vert in enumerate(face.vertices):
+                                    if geo.data.vertices[vert] not in obcalcverts:
+                                        weightres += res[findex][vi] 
+                                        obres.append(res[findex][vi])
+                                        obcalcverts.append(geo.data.vertices[vert])
+                                        vi += 1
+                            else:
+                                weightres += vi_func.triarea(geo, face) * res[findex][fi]/geoarea
+                                obres.append(res[findex][fi])
+                                fi += 1
+            
+                        if (frame == scene.fs and not kwargs.get('genframe')) or (kwargs.get('genframe') and kwargs['genframe'] == scene.frame_start):
+                            geo['oave'], geo['omax'], geo['omin'], geo['oreslist'] = {}, {}, {}, {}
+    
+                        geo['oave'][str(frame)] = weightres
+                        geo['omax'][str(frame)] = max(obres)
+                        geo['omin'][str(frame)] = min(obres)
+                        geo['oreslist'][str(frame)] = obres 
                     
                 
         if not kwargs:

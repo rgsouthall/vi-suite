@@ -68,29 +68,29 @@ def radgexport(export_op, node, **kwargs):
 
         radfile += "# Geometry \n\n"
         # The comment below should limit geometry export to only changing geometry when doing a generative analysis, but doesn't work
-        obs = retobjs('livig')# if not kwargs.get('mo') else kwargs['mo']
-        for o in obs:
-            selobj(scene, o)
-            if o.get('merr') != 1:
-                if node.animmenu == 'Geometry':# or export_op.nodeid.split('@')[0] == 'LiVi Simulation':
-                    bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
-                    objcmd = "obj2mesh -w -a {} {} {}".format(retmat(frame, node), retobj(o.name, scene.frame_current, node), retmesh(o.name, scene.frame_current, node))
-                    objrun = Popen(objcmd, shell = True, stdout = PIPE)                
-                elif export_op.nodeid.split('@')[0] == 'LiVi Simulation':
-                    bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_start, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
-                    objcmd = "obj2mesh -w -a {} {} {}".format(retmat(scene.frame_start, node), retobj(o.name, scene.frame_start, node), retmesh(o.name, scene.frame_start, node))
-                    objrun = Popen(objcmd, shell = True, stdout = PIPE)
-                else:
-                    if frame == scene.fs:                        
+        for o in retobjs('livig'):
+            if not kwargs.get('mo') or (kwargs.get('mo') and o in kwargs['mo']):
+                selobj(scene, o)
+                if o.get('merr') != 1:
+                    if node.animmenu == 'Geometry':# or export_op.nodeid.split('@')[0] == 'LiVi Simulation':
                         bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
                         objcmd = "obj2mesh -w -a {} {} {}".format(retmat(frame, node), retobj(o.name, scene.frame_current, node), retmesh(o.name, scene.frame_current, node))
+                        objrun = Popen(objcmd, shell = True, stdout = PIPE)                
+                    elif export_op.nodeid.split('@')[0] == 'LiVi Simulation':
+                        bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_start, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
+                        objcmd = "obj2mesh -w -a {} {} {}".format(retmat(scene.frame_start, node), retobj(o.name, scene.frame_start, node), retmesh(o.name, scene.frame_start, node))
                         objrun = Popen(objcmd, shell = True, stdout = PIPE)
-                for line in objrun.stdout:
-                    if 'fatal' in str(line):
-                        print('Mesh export error: '+ line)
-                        o['merr'] = 1
-                        break
-                o.select = False
+                    else:
+                        if frame == scene.fs:                        
+                            bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
+                            objcmd = "obj2mesh -w -a {} {} {}".format(retmat(frame, node), retobj(o.name, scene.frame_current, node), retmesh(o.name, scene.frame_current, node))
+                            objrun = Popen(objcmd, shell = True, stdout = PIPE)
+                    for line in objrun.stdout:
+                        if 'fatal' in str(line):
+                            print('Mesh export error: '+ line)
+                            o['merr'] = 1
+                            break
+                    o.select = False
 
             if o.get('merr') != 1:
                 radfile += "void mesh id \n1 "+retmesh(o.name, frame, node)+"\n0\n0\n\n"
@@ -151,7 +151,7 @@ def radgexport(export_op, node, **kwargs):
         geos = retobjs('livig') if export_op.nodeid.split('@')[0] == 'LiVi Geometry' else retobjs('livic')
         for o, geo in enumerate(geos):
             if len(geo.data.materials) > 0:
-                if len([mat for mat in geo.material_slots if mat.material.livi_sense]) > 0:
+                if len([f for f in geo.data.polygons if geo.data.materials[f.material_index].livi_sense]) > 0:
                     geo['licalc'], cverts, obcalcverts, csv, csf, scene.objects.active = 1, [], [], [], [], geo
                     bpy.ops.object.mode_set(mode = 'EDIT')
                     bpy.ops.mesh.select_all(action='DESELECT')
