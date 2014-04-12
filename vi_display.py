@@ -141,11 +141,18 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
         obreslist = [ob for ob in scene.objects if ob.type == 'MESH'  and 'lightarray' not in ob.name and ob.hide == False and ob.layers[scene.active_layer] == True and ob.get('licalc') == 1 and ob.lires == 1]
         obcalclist = [ob for ob in scene.objects if ob.type == 'MESH' and 'lightarray' not in ob.name and ob.hide == False and ob.layers[scene.active_layer] == True and ob.get('licalc') == 1 and ob.lires == 0]
 
-    if (scene.li_disp_panel != 2 and scene.ss_disp_panel != 2) or scene.vi_display_rp != True or not context.space_data.region_3d.is_perspective \
+    if (scene.li_disp_panel != 2 and scene.ss_disp_panel != 2) or scene.vi_display_rp != True \
          or (bpy.context.active_object not in (obcalclist+obreslist) and scene.vi_display_sel_only == True)  \
-         or scene.frame_current not in range(scene.fs, scene.fe + 1) or (bpy.context.active_object and bpy.context.active_object.mode == 'EDIT'):
+         or (bpy.context.active_object and bpy.context.active_object.mode == 'EDIT'):
         return
-        
+    
+    if not context.space_data.region_3d.is_perspective:
+        disp_op.report({'ERROR'},"Switch to prespective vie wmode for number display")
+        return
+    if scene.frame_current not in range(scene.fs, scene.fe + 1):
+        disp_op.report({'ERROR'},"Outside result frame range")
+        return
+    
     if bpy.context.active_object:
         if bpy.context.active_object.type == 'MESH' and bpy.context.active_object.mode != 'OBJECT':
              bpy.context.active_object.mode = 'OBJECT'
@@ -266,11 +273,10 @@ def li3D_legend(self, context, simnode, connode, geonode):
                 findex = scene.frame_current - scene.frame_start if simnode['Animation'] != 'Static' else 0
                 bgl.glColor4f(0.0, 0.0, 0.0, 0.8)
                 blf.size(font_id, 20, 48)
-                if context.active_object:
-                    if context.active_object.get('lires') or context.active_object.get('licalc'):
-                        vi_func.drawfont("Ave: {:.1f}".format(context.active_object['oave'][str(scene.frame_current)]), font_id, 0, height, 22, 480)
-                        vi_func.drawfont("Max: {:.1f}".format(context.active_object['omax'][str(scene.frame_current)]), font_id, 0, height, 22, 495)
-                        vi_func.drawfont("Min: {:.1f}".format(context.active_object['omin'][str(scene.frame_current)]), font_id, 0, height, 22, 510)
+                if context.active_object and (context.active_object.get('lires') or context.active_object.get('licalc')):
+                    vi_func.drawfont("Ave: {:.1f}".format(context.active_object['oave'][str(scene.frame_current)]), font_id, 0, height, 22, 480)
+                    vi_func.drawfont("Max: {:.1f}".format(context.active_object['omax'][str(scene.frame_current)]), font_id, 0, height, 22, 495)
+                    vi_func.drawfont("Min: {:.1f}".format(context.active_object['omin'][str(scene.frame_current)]), font_id, 0, height, 22, 510)
                 else:
                     vi_func.drawfont("Ave: {:.1f}".format(simnode['avres'][findex]), font_id, 0, height, 22, 480)
                     vi_func.drawfont("Max: {:.1f}".format(simnode['maxres'][findex]), font_id, 0, height, 22, 495)

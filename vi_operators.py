@@ -191,7 +191,10 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
         node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
         node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
-
+        if node.bl_label == 'LiVi Basic':
+            node.starttime = datetime.datetime(datetime.datetime.now().year, 1, 1, int(node.shour), int((node.shour - int(node.shour))*60)) + datetime.timedelta(node.sdoy - 1) if node.skynum < 3 else datetime.datetime(datetime.datetime.now().year, 1, 1, 12)
+            if node.animmenu == 'Time' and node.skynum < 3:
+                node.endtime = datetime.datetime(2013, 1, 1, int(node.ehour), int((node.ehour - int(node.ehour))*60)) + datetime.timedelta(node.edoy - 1)
         if bpy.data.filepath:
             if bpy.context.object:
                 if bpy.context.object.type == 'MESH' and bpy.context.object.hide == False and bpy.context.object.layers[0] == True:
@@ -232,8 +235,8 @@ class NODE_OT_RadPreview(bpy.types.Operator, io_utils.ExportHelper):
         rad_prev(self, simnode, connode, geonode, livisimacc(simnode, connode))
         return {'FINISHED'}
 
-class NODE_OT_Calculate(bpy.types.Operator):
-    bl_idname = "node.calculate"
+class NODE_OT_LiViCalc(bpy.types.Operator):
+    bl_idname = "node.livicalc"
     bl_label = "Radiance Export and Simulation"
 
     nodeid = bpy.props.StringProperty()
@@ -250,28 +253,28 @@ class NODE_OT_Calculate(bpy.types.Operator):
             geo.licalc = any([m.livi_sense for m in geo.data.materials])
         geogennode = geonode.outputs['Generative out'].links[0].to_node if geonode.outputs['Generative out'].is_linked else 0  
         
-        if connode.bl_label == 'LiVi Basic':                  
+        if connode.bl_label == 'LiVi Basic':   
+               
             tarnode = connode.outputs['Target out'].links[0].to_node if connode.outputs['Target out'].is_linked else 0
-#        if connode.bl_label == 'LiVi Basic':
+
             if geogennode and tarnode: 
                 simnode['Animation'] = 'Animated'
-#                scene.fs, scene.fe = scene.frame_start, scene.frame_end
                 vigen(self, li_calc, resapply, geonode, connode, simnode, geogennode, tarnode)     
                 scene.vi_display = 1
             elif connode.analysismenu != '3':
-                simnode['Animation'] = connode['Animation']
+                simnode['Animation'] = 'Animated' if scene.gfe > 0 or scene.cfe > 0 else 'Static'
 #                scene.fs = scene.frame_current if simnode['Animation'] == 'Static' else scene.frame_start
 #                scene.fe = scene.frame_current if simnode['Animation'] == 'Static' else scene.frame_end
                 li_calc(self, simnode, connode, geonode, livisimacc(simnode, connode))
                 scene.vi_display = 1
             else:
-                simnode['Animation'] = connode['Animation']
+                simnode['Animation'] = 'Animated' if scene.gfe > 0 or scene.cfe > 0 else 'Static'
 #                scene.fs = scene.frame_current if simnode['Animation'] == 'Static' else scene.frame_start
 #                scene.fe = scene.frame_current if simnode['Animation'] == 'Static' else scene.frame_end
                 li_glare(self, simnode, connode, geonode)
                 scene.vi_display = 0
         else:
-            simnode['Animation'] = connode['Animation']
+            simnode['Animation'] = 'Animated' if scene.gfe > 0 or scene.cfe > 0 else 'Static'
             scene.fs = scene.frame_current if simnode['Animation'] == 'Static' else scene.frame_start
             scene.fe = scene.frame_current if simnode['Animation'] == 'Static' else scene.frame_end
             li_calc(self, simnode, connode, geonode, livisimacc(simnode, connode))

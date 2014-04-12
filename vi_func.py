@@ -88,6 +88,27 @@ def retmesh(name, fr, node):
         return(node.objfilebase+"-{}-{}.mesh".format(name.replace(" ", "_"), fr))
     else:
         return(node.objfilebase+"-{}-{}.mesh".format(name.replace(" ", "_"), bpy.context.scene.frame_start))
+        
+def nodeinputs(node):
+    ins = [i for i in node.inputs if not i.hide]
+    if not all([i.is_linked for i in ins]):
+        print('wrong1')
+        return 0
+    elif not all([i.links[0].from_node.exported for i in ins]):
+        print('wrong2')
+        return 0
+    else:
+        inodes = [i.links[0].from_node for i in ins if i.links[0].from_node.inputs]
+        for inode in inodes:
+            iins = [i for i in inode.inputs if not i.hide]
+            if not all([i.is_linked for i in iins]):
+                print('wrong3')
+                return 0
+            elif not all([i.links[0].from_node.exported for i in iins]):
+                print('wrong4')
+                return 0
+    return 1
+    
 
 def retmat(fr, node):
     if node.animmenu == "Material":
