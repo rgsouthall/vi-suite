@@ -61,18 +61,26 @@ def radgexport(export_op, node, **kwargs):
                 meshmat['RadMat'] = {radname: (matname, radnums)}
                 meshmat.use_vertex_color_paint = 1 if meshmat.livi_sense else 0
             bpy.ops.object.select_all(action='DESELECT')
+            
+            tempmatfilename = node.filebase+".tempmat"
+            with open(tempmatfilename, "w") as tempmatfile:
+                tempmatfile.write(mradfile)
+                
 
         # Geometry export routine
         
         if frame in range(max(node['frames']['Geometry'], node['frames']['Material']) + 1):
+            gframe = scene.frame_current if node['frames']['Geometry'] > 0 else 0
+            mframe = scene.frame_current if node['frames']['Material'] > 0 else 0
             gradfile = "# Geometry \n\n"
             for o in retobjs('livig'):
                 if not kwargs.get('mo') or (kwargs.get('mo') and o in kwargs['mo']):
                     selobj(scene, o)
                     if o.get('merr') != 1:
                         if node.animmenu in ('Geometry'' Material'):# or export_op.nodeid.split('@')[0] == 'LiVi Simulation':
-                            bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
-                            objcmd = "obj2mesh -w -a {} {} {}".format(retmat(scene.frame_current, node), retobj(o.name, scene.frame_current, node), retmesh(o.name, scene.frame_current, node))
+                            bpy.ops.export_scene.obj(filepath=retobj(o.name, gframe, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
+                            objcmd = "obj2mesh -w -a {} {} {}".format(tempmatfilename, retobj(o.name, gframe, node), retmesh(o.name, max(gframe, mframe), node))
+                            print(objcmd)
                             objrun = Popen(objcmd, shell = True, stdout = PIPE)  
                         elif export_op.nodeid.split('@')[0] == 'LiVi Simulation':
                             bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_start, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
@@ -91,7 +99,7 @@ def radgexport(export_op, node, **kwargs):
                         o.select = False
     
                 if o.get('merr') != 1:
-                    gradfile += "void mesh id \n1 "+retmesh(o.name, frame, node)+"\n0\n0\n\n"
+                    gradfile += "void mesh id \n1 "+retmesh(o.name, max(gframe, mframe), node)+"\n0\n0\n\n"
                 else:
                     export_op.report({'INFO'}, o.name+" could not be converted into a Radiance mesh and simpler export routine has been used. No un-applied object modifiers will be exported.")
                     if o.get('merr'):
@@ -195,6 +203,7 @@ def radcexport(export_op, node):
     scene['LiViContext'] = node.bl_label
     clearscene(scene, export_op)
     geonode = node.inputs['Geometry in'].links[0].from_node
+    locnode = node.inputs['Location in'].links[0].from_node
 
     if node.bl_label != 'LiVi CBDM':
         if node['frames']['Time'] > 0 and max(geonode['frames'].values()) > 0:
@@ -206,13 +215,13 @@ def radcexport(export_op, node):
 #        scene.cfe = 0
 
         if node.skynum < 4:
-            print(node['hours'], node['frames']['Time'])
+
             
 #                hours = (endtime-node.starttime).days*24 + (endtime-node.starttime).seconds/3600
 #                scene.cfe = scene.frame_end = scene.fs + int(hours/node.interval) 
 
             for frame in range(scene.fs, scene.cfe + 1):
-                sunexport(scene, node, geonode, frame - scene.fs)
+                sunexport(scene, node, geonode, locnode, frame - scene.fs)
                 if node.skynum < 2 and node.analysismenu != '2':
                     if frame == scene.frame_start:
                         if 'Sun' in [ob for ob in scene.objects if ob.get('VIType')]:
@@ -221,13 +230,13 @@ def radcexport(export_op, node):
                             bpy.ops.object.lamp_add(type='SUN')
                             sun = bpy.context.object
                             sun['VIType'] = 'Sun'
-                    blsunexport(scene, node, frame - scene.fs, sun)
+                    blsunexport(scene, node, locnode, frame - scene.fs, sun)
                 with open(geonode.filebase+"-{}.sky".format(frame), 'a') as skyfilea:
                     skyexport(node, skyfilea)
                 with open(geonode.filebase+"-{}.sky".format(frame), 'r') as skyfiler:
                     skyfileslist.append(skyfiler.read())
                 if node.hdr == True:
-                    hdrexport(scene, frame, node, geonode)
+                    hdrexport(scene, frame, node, geonode, locnode)
 
             node['skyfiles'] = skyfileslist
 
@@ -249,7 +258,7 @@ def radcexport(export_op, node):
         if not node.fromnode:            
             node['source'] = node.sourcemenu if int(node.analysismenu) > 1 else node.sourcemenu2
             if node['source'] == '0' and node.inputs['Location in'].is_linked:
-                locnode = node.inputs['Location in'].links[0].from_node
+#                locnode = node.inputs['Location in'].links[0].from_node
                 if locnode.endmonth < locnode.startmonth:
                     export_op.report({'ERROR'}, "End month is earlier than start month")
                     return
@@ -310,15 +319,15 @@ def radcexport(export_op, node):
     scene.frame_set(scene.fs)
     node.export = 1
 
-def sunexport(scene, node, geonode, frame):
+def sunexport(scene, node, geonode, locnode, frame):
     if node.skynum < 3:        
         simtime = node.starttime + frame*datetime.timedelta(seconds = 3600*node.interval)
-        solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, scene.latitude, scene.longitude)
+        solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, locnode.latitude, locnode.longitude)
         subprocess.call("gensky -ang {} {} {} > {}".format(solalt, solazi, node.skytypeparams, retsky(frame, node, geonode)), shell = True)
     elif node.skynum == 3:
         subprocess.call("gensky -ang {} {} {} > {}".format(45, 0, node.skytypeparams, retsky(frame, node, geonode)), shell = True)
 
-def hdrexport(scene, frame, node, geonode):
+def hdrexport(scene, frame, node, geonode, locnode):
     subprocess.call("oconv {} > {}-{}sky.oct".format(retsky(frame, node, geonode), geonode.filebase, frame), shell=True)
     subprocess.call("rpict -vta -vp 0 0 0 -vd 0 1 0 -vu 0 0 1 -vh 360 -vv 360 -x 1500 -y 1500 {0}-{1}sky.oct > ".format(geonode.filebase, frame) + os.path.join(geonode.newdir, str(frame)+".hdr"), shell=True)
     subprocess.call('cnt 750 1500 | rcalc -f "'+os.path.join(scene.vipath, 'lib', 'latlong.cal"')+' -e "XD=1500;YD=750;inXD=0.000666;inYD=0.001333" | rtrace -af pan.af -n {0} -x 1500 -y 750 -fac "{1}-{2}sky.oct" > '.format(geonode.nproc, geonode.filebase, frame) + '"'+os.path.join(geonode.newdir, str(frame)+'p.hdr')+'"', shell=True)
@@ -327,9 +336,9 @@ def hdrexport(scene, frame, node, geonode):
     else:
         bpy.data.images['{}p.hdr'.format(frame)].reload()
 
-def blsunexport(scene, node, frame, sun):
+def blsunexport(scene, node, locnode, frame, sun):
     simtime = node.starttime + frame*datetime.timedelta(seconds = 3600*node.interval)
-    solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, scene.latitude, scene.longitude)
+    solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, locnode.latitude, locnode.longitude)
     if node.skynum < 2:
         if frame == 0:
             sun.data.shadow_method = 'RAY_SHADOW'
@@ -419,7 +428,7 @@ def cyfc1(self):
                     spathob = ob
         
         if scene.resnode == 'VI Sun Path':
-            beta, phi = solarPosition(scene.solday, scene.solhour, scene.latitude, scene.longitude)[2:]
+            beta, phi = solarPosition(scene.solday, scene.solhour, locnode.latitude, locnode.longitude)[2:]
             if nt.nodes.get('Sky Texture'):
                 bpy.data.worlds['World'].node_tree.nodes['Sky Texture'].sun_direction = -sin(phi), -cos(phi), sin(beta)
             spathob.scale = 3 * [scene.soldistance/100]

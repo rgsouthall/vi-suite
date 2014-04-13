@@ -27,7 +27,7 @@ from .vi_display import li_display, li_compliance, linumdisplay, spnumdisplay, l
 from .envi_export import enpolymatexport, pregeo
 from .envi_mat import envi_materials, envi_constructions
 from .envi_calc import envi_sim
-from .vi_func import processf, livisimacc, solarPosition, retobjs, wr_axes, clearscene, framerange, vcframe, latilongi, nodeinit
+from .vi_func import processf, livisimacc, solarPosition, retobjs, wr_axes, clearscene, framerange, vcframe, epwlatilongi, nodeinit
 from .vi_chart import chart_disp
 from .vi_gen import vigen
 
@@ -841,7 +841,7 @@ class NODE_OT_Shadow(bpy.types.Operator):
 
         fdiff =  1 if simnode['Animation'] == 'Static' else scene.frame_end - scene.frame_start + 1
         locnode = simnode.inputs[0].links[0].from_node
-        latilongi(scene, locnode)
+        epwlatilongi(scene, locnode)
         time = datetime.datetime(datetime.datetime.now().year, locnode.startmonth, 1, simnode.starthour - 1)
         y =  datetime.datetime.now().year if locnode.endmonth >= locnode.startmonth else datetime.datetime.now().year + 1
         endtime = datetime.datetime(y, locnode.endmonth, (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[locnode.endmonth - 1], simnode.endhour - 1)

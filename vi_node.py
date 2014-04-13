@@ -19,7 +19,7 @@
 
 import bpy, glob, os, inspect, sys, datetime
 from nodeitems_utils import NodeCategory, NodeItem
-from .vi_func import nodeinit, objvol, triarea, socklink, newrow, latilongi, nodeid, nodeinputs
+from .vi_func import nodeinit, objvol, triarea, socklink, newrow, epwlatilongi, nodeid, nodeinputs
 
 try:
     import numpy
@@ -124,8 +124,8 @@ class ViLiNode(bpy.types.Node, ViNodes):
         self.skynum = int(self.skymenu) if self.analysismenu != "2" else 3
         self.simalg = (" |  rcalc  -e '$1=47.4*$1+120*$2+11.6*$3' ", " |  rcalc  -e '$1=$1' ", " |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)/100' ", '')[int(self.analysismenu)] \
             if str(sys.platform) != 'win32' else (' |  rcalc  -e "$1=47.4*$1+120*$2+11.6*$3" ', ' |  rcalc  -e "$1=$1" ', ' |  rcalc  -e "$1=(47.4*$1+120*$2+11.6*$3)/100" ', '')[int(self.analysismenu)]
-        if self.inputs['Location in'].is_linked and self.inputs['Location in'].links[0].from_node.bl_label == 'VI Location':
-            latilongi(scene, self.inputs['Location in'].links[0].from_node)        
+#        if self.inputs['Location in'].is_linked and self.inputs['Location in'].links[0].from_node.bl_label == 'VI Location':
+#            latilongi(scene, self.inputs['Location in'].links[0].from_node)        
         if self.edoy < self.sdoy:
             self.edoy = self.sdoy
         if self.edoy == self.sdoy:
@@ -154,6 +154,8 @@ class ViLiNode(bpy.types.Node, ViNodes):
     resname = bpy.props.StringProperty()
     rp_display = bpy.props.BoolProperty(default = False)
     needloc = bpy.props.BoolProperty(default = True)
+    starttimet = datetime.datetime(datetime.datetime.now().year, 1, 1, 12, 0)
+    endtimet = datetime.datetime(datetime.datetime.now().year, 1, 1, 12, 0)
 
     def init(self, context):
         self.inputs.new('ViLiG', 'Geometry in')
@@ -224,9 +226,10 @@ class ViLiCBNode(bpy.types.Node, ViNodes):
         else:
             self.sm = self.sourcemenu
         self.exported = False
-        if self.sourcemenu != '0' and self.inputs['Location in'].is_linked:
+        if self.sm != '0' and self.inputs['Location in'].is_linked:
             bpy.data.node_groups[self['nodeid'].split('@')[1]].links.remove(self.inputs['Location in'].links[0])
-        self.inputs['Location in'].hide = False if self.sourcemenu == '0' else True
+
+        self.inputs['Location in'].hide = False if self.sm == '0' else True
         self.skynum = 4
         self.simalg = (" |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)/1000' ", " |  rcalc  -e '$1=($1+$2+$3)/3000' ", " |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)' ", " |  rcalc  -e '$1=($1+$2+$3)/3' ", " |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)' ")[int(self.analysismenu)]
         self['wd'] = (7, 5)[self.weekdays]
@@ -291,10 +294,10 @@ class ViLiCBNode(bpy.types.Node, ViNodes):
         if not self.fromnode:
             row = layout.row()
             row.label('Source file:')
-            if int(self.analysismenu) < 2:
-                row.prop(self, 'sourcemenu2')
-            else:
-                row.prop(self, 'sourcemenu')
+#            if int(self.analysismenu) < 2:
+            row.prop(self, 'sm')
+#            else:
+#                row.prop(self, 'sourcemenu')
         
             row = layout.row()
             if self.sm == '1':
@@ -316,18 +319,18 @@ class ViLiCBNode(bpy.types.Node, ViNodes):
             row.label('Export HDR:')
             row.prop(self, 'hdr')
             
-        if self.inputs['Geometry in'].is_linked and self.inputs['Geometry in'].links[0].from_node.exported and self.inputs['Geometry in'].links[0].from_node.bl_label == 'LiVi Geometry':
-            if self.inputs['Location in'].is_linked:
-                if self.inputs['Location in'].links[0].from_node.loc == '1':
-                    export = 1
-                else:
-                    export = 0
-            elif self.sm != '0' or self.get('vecvals'):
+        if nodeinputs(self):
+#            if self.inputs['Location in'].is_linked:
+            if self.inputs['Location in'].links[0].from_node.loc == '1':
                 export = 1
             else:
                 export = 0
+        elif self.sm != '0' or self.get('vecvals'):
+            export = 1
         else:
             export = 0
+#        else:
+#            export = 0
 
         if export == 1:
             row = layout.row()
@@ -502,6 +505,11 @@ class ViLoc(bpy.types.Node, ViNodes):
     bl_idname = 'ViLoc'
     bl_label = 'VI Location'
     bl_icon = 'LAMP'
+    
+    
+    def updatelatlong(self, context):
+        if self.loc == '1' and self.weather:
+            self.latitude, self.longitude = epwlatilongi(context.scene, self)
 
     (filepath, filename, filedir, newdir, filebase, objfilebase, nodetree, nproc, rm , cp, cat, fold) = (bpy.props.StringProperty() for x in range(12))
     epwpath = os.path.dirname(inspect.getfile(inspect.currentframe()))+'/EPFiles/Weather/'

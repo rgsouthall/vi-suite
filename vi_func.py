@@ -91,25 +91,20 @@ def retmesh(name, fr, node):
         
 def nodeinputs(node):
     ins = [i for i in node.inputs if not i.hide]
-    if not all([i.is_linked for i in ins]):
-        print('wrong1')
+    if ins and not all([i.is_linked for i in ins]) or not ins:
         return 0
-    elif not all([i.links[0].from_node.exported for i in ins]):
-        print('wrong2')
+    elif ins and not all([i.links[0].from_node.exported for i in ins]):
         return 0
     else:
         inodes = [i.links[0].from_node for i in ins if i.links[0].from_node.inputs]
         for inode in inodes:
             iins = [i for i in inode.inputs if not i.hide]
-            if not all([i.is_linked for i in iins]):
-                print('wrong3')
+            if iins and not all([i.is_linked for i in iins]):
                 return 0
-            elif not all([i.links[0].from_node.exported for i in iins]):
-                print('wrong4')
+            elif iins and not all([i.links[0].from_node.exported for i in iins]):
                 return 0
     return 1
     
-
 def retmat(fr, node):
     if node.animmenu == "Material":
         return(node.filebase+"-"+str(fr)+".rad")
@@ -162,7 +157,7 @@ def clearscene(scene, op):
                 while ob.data.vertex_colors:
                     bpy.ops.mesh.vertex_color_remove()
         
-        if op.nodeid.split('@')[0] != 'LiVi Simulation':   
+        if op.nodeid.split('@')[0] not in ('LiVi Simulation', 'LiVi Geometry'):   
             for sunob in [ob for ob in scene.objects if ob.type == 'LAMP' and ob.data.type == 'SUN']:
                 scene.objects.unlink(sunob)
         
@@ -618,12 +613,13 @@ def sunpath():
     else:
         return
         
-def latilongi(scene, locnode):
-    if locnode and locnode.loc == '1':        
-        with open(locnode.weather, "r") as epwfile:
-            fl = epwfile.readline()
-            scene.latitude, scene.longitude = float(fl.split(",")[6]), float(fl.split(",")[7])
-    return(scene.latitude, scene.longitude)   
+def epwlatilongi(scene, node):        
+    with open(node.weather, "r") as epwfile:
+        fl = epwfile.readline()
+        latitude, longitude = float(fl.split(",")[6]), float(fl.split(",")[7])
+#    else:
+#        latitude, longitude = node.latitude, node.longitude
+    return(latitude, longitude)   
     
 #Compute solar position (altitude and azimuth in degrees) based on day of year (doy; integer), local solar time (lst; decimal hours), latitude (lat; decimal degrees), and longitude (lon; decimal degrees).
 def solarPosition(doy, lst, lat, lon):
