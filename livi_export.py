@@ -66,7 +66,6 @@ def radgexport(export_op, node, **kwargs):
             with open(tempmatfilename, "w") as tempmatfile:
                 tempmatfile.write(mradfile)
                 
-
         # Geometry export routine
         
         if frame in range(max(node['frames']['Geometry'], node['frames']['Material']) + 1):
@@ -79,23 +78,34 @@ def radgexport(export_op, node, **kwargs):
                     if o.get('merr') != 1:
                         if node.animmenu in ('Geometry'' Material'):# or export_op.nodeid.split('@')[0] == 'LiVi Simulation':
                             bpy.ops.export_scene.obj(filepath=retobj(o.name, gframe, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
-                            objcmd = "obj2mesh -w -a {} {} {}".format(tempmatfilename, retobj(o.name, gframe, node), retmesh(o.name, max(gframe, mframe), node))
-                            print(objcmd)
-                            objrun = Popen(objcmd, shell = True, stdout = PIPE)  
+                            objcmd = "obj2mesh -w -a {} {} {}".format(tempmatfilename, retobj(o.name, gframe, node), retmesh(o.name, max(gframe, mframe), node)) 
                         elif export_op.nodeid.split('@')[0] == 'LiVi Simulation':
                             bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_start, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
                             objcmd = "obj2mesh -w -a {} {} {}".format(retmat(scene.frame_start, node), retobj(o.name, scene.frame_start, node), retmesh(o.name, scene.frame_start, node))
-                            objrun = Popen(objcmd, shell = True, stdout = PIPE)
                         else:
                             if frame == scene.fs:                        
                                 bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
                                 objcmd = "obj2mesh -w -a {} {} {}".format(retmat(frame, node), retobj(o.name, scene.frame_current, node), retmesh(o.name, scene.frame_current, node))
-                                objrun = Popen(objcmd, shell = True, stdout = PIPE)
+                            else:
+                                objcmd = ''
+                        objrun = Popen(objcmd, shell = True, stdout = PIPE, stderr=STDOUT)
+                        
+#                       if objrun.stderr:
+#                            print(str(objrun.stderr))
+                            
+                        
                         for line in objrun.stdout:
-                            if 'fatal' in str(line):
-                                print('Mesh export error: '+ line)
+                            if 'non-triangle' in line.decode():
+                                export_op.report({'INFO'}, o.name+" has an incompatible mesh. Doing a simplified export")
                                 o['merr'] = 1
                                 break
+                                
+#                        for line in objrun.stderr:
+#                            print('hi', line.decode())
+#                            if 'fatal' in line.decode() or 'non-triangle' in line.decode():
+#                                export_op.report({'INFO'}, o.name+" has an incompatible obj file. Doing a simplified export")
+#                                o['merr'] = 1
+#                                break
                         o.select = False
     
                 if o.get('merr') != 1:
@@ -203,23 +213,15 @@ def radcexport(export_op, node):
     scene['LiViContext'] = node.bl_label
     clearscene(scene, export_op)
     geonode = node.inputs['Geometry in'].links[0].from_node
-    locnode = node.inputs['Location in'].links[0].from_node
 
     if node.bl_label != 'LiVi CBDM':
-        if node['frames']['Time'] > 0 and max(geonode['frames'].values()) > 0:
-#        node['Animation'] = ('Static', '', 'TAnimated', 'Animated', 'GAnimated')[(geonode.animmenu == 'Static' and (node.animmenu == 'Static' or node.skynum > 2), \
-#        geonode.animmenu != 'Static' and node.animmenu != 'Static', node.animmenu == 'Time' and node.skynum < 3, geonode.animmenu != 'Static').index(1)]
-#        if not node['Animation']:
-            export_op.report({'ERROR'},"You cannot run a geometry and time based animation at the same time")
-            return
-#        scene.cfe = 0
-
         if node.skynum < 4:
-
+            if node.skynum == 3:
+                locnode = 0
+#                subprocess.call("gensky -ang {} {} {} > {}".format(45, 0, node.skytypeparams, retsky(0, node, geonode)), shell = True)
+            else:
+                locnode = node.inputs['Location in'].links[0].from_node
             
-#                hours = (endtime-node.starttime).days*24 + (endtime-node.starttime).seconds/3600
-#                scene.cfe = scene.frame_end = scene.fs + int(hours/node.interval) 
-
             for frame in range(scene.fs, scene.cfe + 1):
                 sunexport(scene, node, geonode, locnode, frame - scene.fs)
                 if node.skynum < 2 and node.analysismenu != '2':
@@ -236,10 +238,9 @@ def radcexport(export_op, node):
                 with open(geonode.filebase+"-{}.sky".format(frame), 'r') as skyfiler:
                     skyfileslist.append(skyfiler.read())
                 if node.hdr == True:
-                    hdrexport(scene, frame, node, geonode, locnode)
-
+                    hdrexport(scene, frame, node, geonode)
             node['skyfiles'] = skyfileslist
-
+            
         elif node.skynum == 4:
             if node.hdrname not in bpy.data.images:
                 bpy.data.images.load(node.hdrname)
@@ -258,7 +259,7 @@ def radcexport(export_op, node):
         if not node.fromnode:            
             node['source'] = node.sourcemenu if int(node.analysismenu) > 1 else node.sourcemenu2
             if node['source'] == '0' and node.inputs['Location in'].is_linked:
-#                locnode = node.inputs['Location in'].links[0].from_node
+                locnode = node.inputs['Location in'].links[0].from_node
                 if locnode.endmonth < locnode.startmonth:
                     export_op.report({'ERROR'}, "End month is earlier than start month")
                     return
@@ -319,15 +320,16 @@ def radcexport(export_op, node):
     scene.frame_set(scene.fs)
     node.export = 1
 
-def sunexport(scene, node, geonode, locnode, frame):
-    if node.skynum < 3:        
+def sunexport(scene, node, geonode, locnode, frame): 
+    if locnode:
         simtime = node.starttime + frame*datetime.timedelta(seconds = 3600*node.interval)
         solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, locnode.latitude, locnode.longitude)
         subprocess.call("gensky -ang {} {} {} > {}".format(solalt, solazi, node.skytypeparams, retsky(frame, node, geonode)), shell = True)
-    elif node.skynum == 3:
-        subprocess.call("gensky -ang {} {} {} > {}".format(45, 0, node.skytypeparams, retsky(frame, node, geonode)), shell = True)
+    else:
+        subprocess.call("gensky -ang {} {} {} > {}".format(45, 0, node.skytypeparams, retsky(0, node, geonode)), shell = True)
 
-def hdrexport(scene, frame, node, geonode, locnode):
+def hdrexport(scene, frame, node, geonode):
+#    if locnode:
     subprocess.call("oconv {} > {}-{}sky.oct".format(retsky(frame, node, geonode), geonode.filebase, frame), shell=True)
     subprocess.call("rpict -vta -vp 0 0 0 -vd 0 1 0 -vu 0 0 1 -vh 360 -vv 360 -x 1500 -y 1500 {0}-{1}sky.oct > ".format(geonode.filebase, frame) + os.path.join(geonode.newdir, str(frame)+".hdr"), shell=True)
     subprocess.call('cnt 750 1500 | rcalc -f "'+os.path.join(scene.vipath, 'lib', 'latlong.cal"')+' -e "XD=1500;YD=750;inXD=0.000666;inYD=0.001333" | rtrace -af pan.af -n {0} -x 1500 -y 750 -fac "{1}-{2}sky.oct" > '.format(geonode.nproc, geonode.filebase, frame) + '"'+os.path.join(geonode.newdir, str(frame)+'p.hdr')+'"', shell=True)
@@ -338,7 +340,7 @@ def hdrexport(scene, frame, node, geonode, locnode):
 
 def blsunexport(scene, node, locnode, frame, sun):
     simtime = node.starttime + frame*datetime.timedelta(seconds = 3600*node.interval)
-    solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, locnode.latitude, locnode.longitude)
+    solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, locnode['latitude'], locnode['longitude'])
     if node.skynum < 2:
         if frame == 0:
             sun.data.shadow_method = 'RAY_SHADOW'
@@ -389,7 +391,6 @@ def fexport(scene, frame, export_op, node, othernode, **kwargs):
     bpy.data.texts['Radiance input-{}'.format(frame)].write(radtext)
     
     oconvcmd = "oconv -w {0}-{1}.rad > {0}-{1}.oct".format(geonode.filebase, frame)
-    print(oconvcmd)
     
 #    This next line allows the radiance scene description to be piped into the oconv command.
 #   oconvcmd = "oconv -w - > {0}-{1}.oct".format(geonode.filebase, frame).communicate(input = radtext.encode('utf-8'))
@@ -398,7 +399,7 @@ def fexport(scene, frame, export_op, node, othernode, **kwargs):
 
     for line in oconvrun.stdout:
         if 'incompatible' in line.decode():
-            export_op.report({'ERROR'},"Incompatible mesh format. Try increasing the sleep period in ti.sleep in the livi_export.py file")
+            export_op.report({'ERROR'}, line.decode() + " Try increasing the sleep period in ti.sleep in the livi_export.py file")
     ti.sleep(pt)
     export_op.report({'INFO'},"Export is finished")
 

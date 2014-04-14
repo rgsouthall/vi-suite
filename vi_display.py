@@ -224,10 +224,10 @@ def li3D_legend(self, context, simnode, connode, geonode):
         if scene.vi_leg_display != True or scene.vi_display == 0 or (scene.wr_disp_panel != 1 and scene.li_disp_panel != 2 and scene.ss_disp_panel != 2) or scene.frame_current not in range(scene.fs, scene.fe + 1):
             return
         else:
-            if not connode or (connode and connode.bl_label == 'LiVi CBDM'):
-                resvals = ['{:.1f}'.format(min(simnode['minres'])+i*(max(simnode['maxres'])-min(simnode['minres']))/19) for i in range(20)]
+            if max(simnode['maxres']) > 100:
+                resvals = ['{:.0f}'.format(min(simnode['minres'])+i*(max(simnode['maxres'])-min(simnode['minres']))/19) for i in range(20)]
             else:
-                resvals = [('{:.0f}', '{:.0f}', '{:.1f}')[int(connode.analysismenu)].format(min(simnode['minres'])+i*(max(simnode['maxres'])-min(simnode['minres']))/19) for i in range(20)]
+                resvals = ['{:.1f}'.format(min(simnode['minres'])+i*(max(simnode['maxres'])-min(simnode['minres']))/19) for i in range(20)]
     
             height = context.region.height
             lenres = len(resvals[-1])
@@ -253,17 +253,17 @@ def li3D_legend(self, context, simnode, connode, geonode):
                 blf.draw(font_id, "  "*(lenres - len(resvals[i]) ) + resvals[i])    
             blf.size(font_id, 20, 56)
 
-            if connode:
-                if connode.bl_label == 'LiVi CBDM':
-                    unit = ('kLuxHours', 'kWh', 'DA (%)', '', 'UDI-a (%)')[int(connode.analysismenu)]
-                elif connode.bl_label == 'LiVi Basic':
-                    unit = ("Lux", "W/m"+ u'\u00b2', "DF %")[int(connode.analysismenu)]
-                elif connode.bl_label == 'LiVi Compliance':
-                    unit = "DF %"
-                else:
-                    unit = 'unit'
+#            if connode:
+#                if connode.bl_label == 'LiVi CBDM':
+#                    unit = ('kLuxHours', 'kWh', 'DA (%)', '', 'UDI-a (%)')[int(connode.analysismenu)]
+#                elif connode.bl_label == 'LiVi Basic':
+#                    unit = ("Lux", "W/m"+ u'\u00b2', "DF %")[int(connode.analysismenu)]
+#                elif connode.bl_label == 'LiVi Compliance':
+#                    unit = "DF %"
+#                else:
+#                    unit = 'unit'
     
-            cu = unit if connode else '% Sunlit'    
+            cu = connode['unit'] if connode else '% Sunlit'    
             vi_func.drawfont(cu, font_id, 0, height, 25, 57)
             bgl.glLineWidth(1)
             bgl.glDisable(bgl.GL_BLEND)

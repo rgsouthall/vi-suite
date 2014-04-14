@@ -488,7 +488,14 @@ def drawfont(text, fi, lencrit, height, x1, y1):
     blf.draw(fi, text)
 
 def mtx2vals(mtxlines, fwd, locnode):
-    records = (datetime.datetime(datetime.datetime.now().year, locnode.endmonth, 1) - datetime.datetime(datetime.datetime.now().year, locnode.startmonth, 1)).days*24
+    if locnode:
+        records = (datetime.datetime(datetime.datetime.now().year, locnode.endmonth, 1) - datetime.datetime(datetime.datetime.now().year, locnode.startmonth, 1)).days*24
+    else:
+        records = 0
+        for line in mtxlines:
+            while line:
+                records += 1
+            break
     try:
         import numpy
         np = 1

@@ -98,8 +98,8 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
                         svresfile.write("{}".format(svres[findex]).strip("]").strip("["))
 
             if connode.bl_label == 'LiVi CBDM' and int(connode.analysismenu) > 1:
-                if connode.sourcemenu == '2':
-                    connode['vecvals'], vals = vi_func.mtx2vals(open(connode.vecname, "r"), datetime.datetime(2010, 1, 1).weekday())
+                if connode.sourcemenu == '1':
+                    connode['vecvals'], vals = vi_func.mtx2vals(open(connode.mtxname, "r").readlines(), datetime.datetime(2010, 1, 1).weekday(), '')
                 hours = 0
                 sensarray = [[0 for x in range(146)] for y in range(geonode.reslen)] if np == 0 else numpy.zeros([geonode.reslen, 146])
                 oconvcmd = "oconv -w - > {0}-ws.oct".format(geonode.filebase)

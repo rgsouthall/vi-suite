@@ -20,6 +20,7 @@
 import bpy, glob, os, inspect, sys, datetime
 from nodeitems_utils import NodeCategory, NodeItem
 from .vi_func import nodeinit, objvol, triarea, socklink, newrow, epwlatilongi, nodeid, nodeinputs
+from .livi_export import blsunexport
 
 try:
     import numpy
@@ -113,7 +114,6 @@ class ViLiNode(bpy.types.Node, ViNodes):
         self.bl_label = '*LiVi Basic'
         self.outputs['Target out'].hide = True if self.animmenu != 'Static' else False
         if self.analysismenu == '2' or self.skymenu not in ('0', '1', '2'):
-#            self.needloc = 0
             if self.inputs['Location in'].is_linked:
                 bpy.data.node_groups[self['nodeid'].split('@')[1]].links.remove(self.inputs['Location in'].links[0])
             self.inputs['Location in'].hide = True
@@ -123,9 +123,7 @@ class ViLiNode(bpy.types.Node, ViNodes):
             self.skytypeparams = ("+s", "+i", "-c", "-b 22.86 -c")[int(self.skymenu)]
         self.skynum = int(self.skymenu) if self.analysismenu != "2" else 3
         self.simalg = (" |  rcalc  -e '$1=47.4*$1+120*$2+11.6*$3' ", " |  rcalc  -e '$1=$1' ", " |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)/100' ", '')[int(self.analysismenu)] \
-            if str(sys.platform) != 'win32' else (' |  rcalc  -e "$1=47.4*$1+120*$2+11.6*$3" ', ' |  rcalc  -e "$1=$1" ', ' |  rcalc  -e "$1=(47.4*$1+120*$2+11.6*$3)/100" ', '')[int(self.analysismenu)]
-#        if self.inputs['Location in'].is_linked and self.inputs['Location in'].links[0].from_node.bl_label == 'VI Location':
-#            latilongi(scene, self.inputs['Location in'].links[0].from_node)        
+            if str(sys.platform) != 'win32' else (' |  rcalc  -e "$1=47.4*$1+120*$2+11.6*$3" ', ' |  rcalc  -e "$1=$1" ', ' |  rcalc  -e "$1=(47.4*$1+120*$2+11.6*$3)/100" ', '')[int(self.analysismenu)]       
         if self.edoy < self.sdoy:
             self.edoy = self.sdoy
         if self.edoy == self.sdoy:
@@ -135,7 +133,20 @@ class ViLiNode(bpy.types.Node, ViNodes):
         self.endtime = datetime.datetime(datetime.datetime.now().year, 1, 1, int(self.ehour), int((self.ehour - int(self.ehour))*60)) + datetime.timedelta(self.edoy - 1) if self.animmenu == 'Time' else self.starttime
         self['hours'] = (self.endtime-self.starttime).days*24 + (self.endtime-self.starttime).seconds/3600
         self['frames']['Time'] = scene.cfe = scene.fs + int(self['hours']/self.interval)
-        self['resname'] = ("illumout", "irradout", "dfout", '')[int(self.analysismenu)]        
+        self['resname'] = ("illumout", "irradout", "dfout", '')[int(self.analysismenu)] 
+        self['unit'] = ("Lux", "W/m"+ u'\u00b2', "DF %")[int(connode.analysismenu)]
+#        if self.skynum < 2 and self.analysismenu != '2' and self.inputs['Location in'].is_linked:
+#            locnode = self.inputs['Location in'].links[0].from_node
+#            if 'SUN' in [ob.data.type for ob in scene.objects if ob.type == 'LAMP']:
+#                sun = [ob for ob in scene.objects if ob.type == 'LAMP' and ob.data.type == 'SUN'][0]
+#            else:
+#                bpy.ops.object.lamp_add(type='SUN')
+#                sun = bpy.context.object
+#                sun['VIType'] = 'Sun'
+#            
+#            for frame in range(scene.fs, scene.cfe + 1):
+#                blsunexport(scene, self, locnode, frame - scene.fs, sun)
+            
 
     analysismenu = bpy.props.EnumProperty(name="", description="Type of lighting analysis", items = analysistype, default = '0', update = nodeexported)
     simalg = bpy.props.StringProperty(name="", description="Algorithm to run on the radiance results", default=" |  rcalc  -e '$1=47.4*$1+120*$2+11.6*$3' " if str(sys.platform) != 'win32' else ' |  rcalc  -e "$1=47.4*$1+120*$2+11.6*$3" ')
@@ -169,6 +180,7 @@ class ViLiNode(bpy.types.Node, ViNodes):
         self['hours'] = 0         
         self['frames'] = {'Time':0}
         self['resname'] = 'illumout'
+        self['unit'] = "Lux"
 
     def draw_buttons(self, context, layout):
         row = layout.row()
@@ -214,7 +226,13 @@ class ViLiNode(bpy.types.Node, ViNodes):
             else:
                 row.label('Cannot have geometry and time animation')
 
-class ViLiCBNode(bpy.types.Node, ViNodes):
+class ViLiClass(bpy.types.Node):
+    '''Node describing a base LiVi context node'''
+    bl_idname = 'ViLiClass'
+    bl_label = 'LiVi Base Class'
+    bl_icon = 'LAMP'
+    
+class ViLiCBNode(ViLiClass, ViNodes):
     '''Node describing a VI-Suite climate based lighting node'''
     bl_idname = 'ViLiCBNode'
     bl_label = 'LiVi CBDM'
@@ -234,7 +252,8 @@ class ViLiCBNode(bpy.types.Node, ViNodes):
         self.simalg = (" |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)/1000' ", " |  rcalc  -e '$1=($1+$2+$3)/3000' ", " |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)' ", " |  rcalc  -e '$1=($1+$2+$3)/3' ", " |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)' ")[int(self.analysismenu)]
         self['wd'] = (7, 5)[self.weekdays]
         self['resname'] = ('kluxhours', 'cumwatth', 'dayauto', 'hourrad', 'udi')[int(self.analysismenu)]
-
+        self['unit'] = ('kLuxHours', 'kWh', 'DA (%)', '', 'UDI-a (%)')[int(self.analysismenu)]
+    
     analysistype = [('0', "Light Exposure", "LuxHours Calculation"), ('1', "Radiation Exposure", "kWh/m"+ u'\u00b2' + " Calculation"), ('2', "Daylight Autonomy", "DA (%) Calculation"), ('3', "Hourly irradiance", "Irradiance for each simulation time step"), ('4', "UDI", "Useful Daylight Illuminance")]
     analysismenu = bpy.props.EnumProperty(name="", description="Type of lighting analysis", items = analysistype, default = '0', update = nodeexported)
     animtype = [('0', "Static", "Simple static analysis"), ('1', "Geometry", "Animated time analysis"), ('2', "Material", "Animated time analysis")]
@@ -269,10 +288,12 @@ class ViLiCBNode(bpy.types.Node, ViNodes):
         self.inputs.new('ViLiG', 'Geometry in')
         self.outputs.new('ViLiC', 'Context out')
         self.outputs['Context out'].hide = True
-        self['nodeid'] = nodeid(self, bpy.data.node_groups)    
+        self['nodeid'] = nodeid(self, bpy.data.node_groups)  
+        self['frames'] = {'Time':0}
         self['resname'] = 'kluxhours'
         self['whitesky'] = "void glow sky_glow \n0 \n0 \n4 1 1 1 0 \nsky_glow source sky \n0 \n0 \n4 0 0 1 180 \nvoid glow ground_glow \n0 \n0 \n4 1 1 1 0 \nground_glow source ground \n0 \n0 \n4 0 0 -1 180\n\n"
-
+        self['unit'] = 'kLuxHours'
+        
     def draw_buttons(self, context, layout):
         row = layout.row()
         row.label("Analysis Type:")
@@ -294,10 +315,10 @@ class ViLiCBNode(bpy.types.Node, ViNodes):
         if not self.fromnode:
             row = layout.row()
             row.label('Source file:')
-#            if int(self.analysismenu) < 2:
-            row.prop(self, 'sm')
-#            else:
-#                row.prop(self, 'sourcemenu')
+            if int(self.analysismenu) < 2:
+                row.prop(self, 'sourcemenu2')
+            else:
+                row.prop(self, 'sourcemenu')
         
             row = layout.row()
             if self.sm == '1':
@@ -320,17 +341,17 @@ class ViLiCBNode(bpy.types.Node, ViNodes):
             row.prop(self, 'hdr')
             
         if nodeinputs(self):
-#            if self.inputs['Location in'].is_linked:
-            if self.inputs['Location in'].links[0].from_node.loc == '1':
+            if self.inputs['Location in'].is_linked:
+                if self.inputs['Location in'].links[0].from_node.loc == '1':
+                    export = 1
+                else:
+                    export = 0
+            elif self.sm != '0' or self.get('vecvals'):
                 export = 1
             else:
                 export = 0
-        elif self.sm != '0' or self.get('vecvals'):
-            export = 1
         else:
             export = 0
-#        else:
-#            export = 0
 
         if export == 1:
             row = layout.row()
@@ -365,14 +386,16 @@ class ViLiCNode(bpy.types.Node, ViNodes):
     analysismenu = bpy.props.EnumProperty(name="", description="Type of analysis", items = analysistype, default = '0', update = nodeexported)
     bambuildmenu = bpy.props.EnumProperty(name="", description="Type of building", items=bambuildtype, default = '0', update = nodeexported)
     cusacc = bpy.props.StringProperty(name="", description="Custom Radiance simulation parameters", default="", update = nodeexported)
-    skytypeparams = "-b 22.86 -c"
+    skytypeparams = bpy.props.StringProperty(default = "-b 22.86 -c")
     
     def init(self, context):
         self.inputs.new('ViLiG', 'Geometry in')
         self.outputs.new('ViLiC', 'Context out')
         self.outputs['Context out'].hide = True
         self['nodeid'] = nodeid(self, bpy.data.node_groups)
+        self['frames'] = {'Time':0}
         self['resname'] = 'breaamout'
+        self['unit'] = "DF %"
  
     def draw_buttons(self, context, layout):
         newrow(layout, "Compliance standard:", self, 'analysismenu')
@@ -505,19 +528,20 @@ class ViLoc(bpy.types.Node, ViNodes):
     bl_idname = 'ViLoc'
     bl_label = 'VI Location'
     bl_icon = 'LAMP'
-    
-    
+            
     def updatelatlong(self, context):
         if self.loc == '1' and self.weather:
-            self.latitude, self.longitude = epwlatilongi(context.scene, self)
+            self['latitude'], self['longitude'] = epwlatilongi(context.scene, self)
+        else:
+            self['latitude'], self['longitude'] = self.latitude, self.longitude         
 
     (filepath, filename, filedir, newdir, filebase, objfilebase, nodetree, nproc, rm , cp, cat, fold) = (bpy.props.StringProperty() for x in range(12))
     epwpath = os.path.dirname(inspect.getfile(inspect.currentframe()))+'/EPFiles/Weather/'
     weatherlist = [((wfile, os.path.basename(wfile).strip('.epw').split(".")[0], 'Weather Location')) for wfile in glob.glob(epwpath+"/*.epw")]
-    weather = bpy.props.EnumProperty(items = weatherlist, name="", description="Weather for this project")
-    loc = bpy.props.EnumProperty(items = [("0", "Manual", "Manual location"), ("1", "EPW ", "Get location from EPW file")], name = "", description = "Location", default = "0")
-    latitude = bpy.props.FloatProperty(name="Latitude", description="Site Latitude", min=-90, max=90, default=52)
-    longitude = bpy.props.FloatProperty(name="Longitude", description="Site Longitude (East is positive, West is negative)", min=-180, max=180, default=0)
+    weather = bpy.props.EnumProperty(items = weatherlist, name="", description="Weather for this project", update = updatelatlong)
+    loc = bpy.props.EnumProperty(items = [("0", "Manual", "Manual location"), ("1", "EPW ", "Get location from EPW file")], name = "", description = "Location", default = "0", update = updatelatlong)
+    latitude = bpy.props.FloatProperty(name="Latitude", description="Site Latitude", min=-90, max=90, default=52, update = updatelatlong)
+    longitude = bpy.props.FloatProperty(name="Longitude", description="Site Longitude (East is positive, West is negative)", min=-180, max=180, default=0, update = updatelatlong)
     maxws = bpy.props.FloatProperty(name="", description="Max wind speed", min=0, max=90, default=0)
     minws = bpy.props.FloatProperty(name="", description="Min wind speed", min=0, max=90, default=0)
     avws = bpy.props.FloatProperty(name="", description="Average wind speed", min=0, max=90, default=0)
@@ -545,9 +569,9 @@ class ViLoc(bpy.types.Node, ViNodes):
             row.prop(self, "weather")
         else:
             row = layout.row()
-            row.prop(scene, "latitude")
+            row.prop(self, "latitude")
             row = layout.row()
-            row.prop(scene, "longitude")
+            row.prop(self, "longitude")
         if not self.outputs['Location out'].is_linked or (self.outputs['Location out'].is_linked and self.outputs['Location out'].links[0].to_node.bl_label not in ('LiVi Basic', 'VI Sun Path')):
             row = layout.row()
             row.prop(self, "startmonth")
