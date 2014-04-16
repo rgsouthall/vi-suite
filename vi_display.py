@@ -149,7 +149,7 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
     if not context.space_data.region_3d.is_perspective:
         disp_op.report({'ERROR'},"Switch to prespective vie wmode for number display")
         return
-    if scene.frame_current not in range(scene.fs, scene.fe + 1):
+    if scene.frame_current not in range(scene.fs, scene.fe + 1) and scene.vi_display:
         disp_op.report({'ERROR'},"Outside result frame range")
         return
     
@@ -252,16 +252,6 @@ def li3D_legend(self, context, simnode, connode, geonode):
                 blf.position(font_id, 65, (i*20)+height - 455, 0)
                 blf.draw(font_id, "  "*(lenres - len(resvals[i]) ) + resvals[i])    
             blf.size(font_id, 20, 56)
-
-#            if connode:
-#                if connode.bl_label == 'LiVi CBDM':
-#                    unit = ('kLuxHours', 'kWh', 'DA (%)', '', 'UDI-a (%)')[int(connode.analysismenu)]
-#                elif connode.bl_label == 'LiVi Basic':
-#                    unit = ("Lux", "W/m"+ u'\u00b2', "DF %")[int(connode.analysismenu)]
-#                elif connode.bl_label == 'LiVi Compliance':
-#                    unit = "DF %"
-#                else:
-#                    unit = 'unit'
     
             cu = connode['unit'] if connode else '% Sunlit'    
             vi_func.drawfont(cu, font_id, 0, height, 25, 57)

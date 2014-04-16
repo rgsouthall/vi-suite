@@ -90,20 +90,23 @@ def retmesh(name, fr, node):
         return(node.objfilebase+"-{}-{}.mesh".format(name.replace(" ", "_"), bpy.context.scene.frame_start))
         
 def nodeinputs(node):
-    ins = [i for i in node.inputs if not i.hide]
-    if ins and not all([i.is_linked for i in ins]) or not ins:
-        return 0
-    elif ins and not all([i.links[0].from_node.exported for i in ins]):
-        return 0
-    else:
-        inodes = [i.links[0].from_node for i in ins if i.links[0].from_node.inputs]
-        for inode in inodes:
-            iins = [i for i in inode.inputs if not i.hide]
-            if iins and not all([i.is_linked for i in iins]):
-                return 0
-            elif iins and not all([i.links[0].from_node.exported for i in iins]):
-                return 0
-    return 1
+    try:
+        ins = [i for i in node.inputs if not i.hide]
+        if ins and not all([i.is_linked for i in ins]):
+            return 0
+        elif ins and not all([i.links[0].from_node.exported for i in ins if i.is_linked]):
+            return 0
+        else:
+            inodes = [i.links[0].from_node for i in ins if i.links[0].from_node.inputs]
+            for inode in inodes:
+                iins = [i for i in inode.inputs if not i.hide]
+                if iins and not all([i.is_linked for i in iins]):
+                    return 0
+                elif iins and not all([i.links[0].from_node.exported for i in iins if i.is_linked]):
+                    return 0
+        return 1
+    except:
+        pass
     
 def retmat(fr, node):
     if node.animmenu == "Material":
@@ -397,9 +400,10 @@ def rettimes(ts, fs, us):
 
 def socklink(sock, ng):
     try:
-        lsock = (sock.links[0].from_socket, sock.links[0].to_socket)[sock.in_out == 'OUT']
-        if sock.is_linked and sock.draw_color(bpy.context, sock.node) != lsock.draw_color(bpy.context, lsock.node):
-            bpy.data.node_groups[ng].links.remove(sock.links[0])
+        for link in sock.links:
+            lsock = (link.from_socket, link.to_socket)[sock.is_output]
+            if sock.is_linked and sock.draw_color(bpy.context, sock.node) != lsock.draw_color(bpy.context, lsock.node):
+                bpy.data.node_groups[ng].links.remove(link)
     except:
         pass
 
@@ -491,11 +495,9 @@ def mtx2vals(mtxlines, fwd, locnode):
     if locnode:
         records = (datetime.datetime(datetime.datetime.now().year, locnode.endmonth, 1) - datetime.datetime(datetime.datetime.now().year, locnode.startmonth, 1)).days*24
     else:
-        records = 0
-        for line in mtxlines:
-            while line:
-                records += 1
-            break
+        for records, line in enumerate(mtxlines):
+            if line == '\n':
+                break
     try:
         import numpy
         np = 1

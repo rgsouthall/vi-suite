@@ -181,7 +181,7 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
                         if (frame == scene.fs and not kwargs.get('genframe')) or (kwargs.get('genframe') and kwargs['genframe'] == scene.frame_start):
                             geo['oave'], geo['omax'], geo['omin'], geo['oreslist'] = {}, {}, {}, {}
     
-                        geo['oave'][str(frame)] = weightres/len(sensefaces)
+                        geo['oave'][str(frame)] = weightres/(1, len(obcalcverts))[geonode.cpoint == '1'] 
                         geo['omax'][str(frame)] = max(obres)
                         geo['omin'][str(frame)] = min(obres)
                         geo['oreslist'][str(frame)] = obres 

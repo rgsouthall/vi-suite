@@ -44,13 +44,18 @@ class NODE_OT_LiGExport(bpy.types.Operator):
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
         if bpy.data.filepath and " " not in bpy.data.filepath:
             node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
+            for mglfr in node['frames']:
+                node['frames'][mglfr] = scene.frame_end if node.animmenu == mglfr else 0
+                scene.gfe = max(node['frames'].values())
             if node.filepath != bpy.data.filepath:
                 nodeinit(node)
             node.reslen = 0
             scene.frame_start, bpy.data.node_groups[self.nodeid.split('@')[1]].use_fake_user = 0, 1
             scene.frame_set(0)
             radgexport(self, node)
-            node.exported, node.outputs[1].hide = True, False
+            node.exported = True
+            node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
+            node.outputs['Geometry out'].hide = False
             return {'FINISHED'}
 
         elif " "  in bpy.data.filepath:
@@ -185,13 +190,14 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
     nodeid = bpy.props.StringProperty()
 
     def invoke(self, context, event):
+        node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
         scene = context.scene
+        scene.li_compliance = 1 if node.bl_label == 'LiVi Compliance' else 0
+        scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
         scene.frame_start = 0
         scene.frame_set(0)
-        scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
-        node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
-        node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
-        if node.bl_label == 'LiVi Basic':
+                
+        if 'LiVi Basic' in node.bl_label:
             node.starttime = datetime.datetime(datetime.datetime.now().year, 1, 1, int(node.shour), int((node.shour - int(node.shour))*60)) + datetime.timedelta(node.sdoy - 1) if node.skynum < 3 else datetime.datetime(datetime.datetime.now().year, 1, 1, 12)
             if node.animmenu == 'Time' and node.skynum < 3:
                 node.endtime = datetime.datetime(2013, 1, 1, int(node.ehour), int((node.ehour - int(node.ehour))*60)) + datetime.timedelta(node.edoy - 1)
@@ -205,6 +211,7 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
                 or (node.bl_label != 'LiVi CBDM' and node.inputs['Geometry in'].is_linked):
                     radcexport(self, node)
                     node.exported = True
+                    node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
                     node.outputs['Context out'].hide = False
                 else:
                     self.report({'ERROR'},"Required input nodes are not linked")
@@ -501,12 +508,6 @@ class NODE_OT_SunPath(bpy.types.Operator):
         if 'Sun' not in [mat.name for mat in bpy.data.materials]:
             bpy.data.materials.new('Sun')
             bpy.data.materials['Sun'].diffuse_color = (1, 1, 1)
-
-        if locnode.loc == "1":
-            with open(locnode.weather, "r") as epwfile:
-               fl = epwfile.readline()
-               scene.latitude, scene.longitude = float(fl.split(",")[6]), float(fl.split(",")[7])
-        
         if 'SUN' in [ob.data.type for ob in context.scene.objects if ob.data == 'LAMP' and ob.hide == False]:
             [ob.data.type for ob in context.scene.objects if ob.data == 'LAMP' and ob.data.type == 'SUN'][0]['VIType'] = 'Sun'
             
@@ -562,7 +563,7 @@ class NODE_OT_SunPath(bpy.types.Operator):
         for doy in range(0, 363):
             if (doy-4)%7 == 0:
                 for hour in range(1, 25):
-                    ([solalt, solazi]) = solarPosition(doy, hour, scene.latitude, scene.longitude)[2:]
+                    ([solalt, solazi]) = solarPosition(doy, hour, locnode.latitude, locnode.longitude)[2:]
                     spathmesh.vertices.add(1)
                     spathmesh.vertices[-1].co = [-(sd-(sd-(sd*cos(solalt))))*sin(solazi), -(sd-(sd-(sd*cos(solalt))))*cos(solazi), sd*sin(solalt)]
 
@@ -579,7 +580,7 @@ class NODE_OT_SunPath(bpy.types.Operator):
 
         for doy in (79, 172, 355):
             for hour in range(1, 25):
-                ([solalt, solazi]) = solarPosition(doy, hour, scene.latitude, scene.longitude)[2:]
+                ([solalt, solazi]) = solarPosition(doy, hour, locnode.latitude, locnode.longitude)[2:]
                 spathmesh.vertices.add(1)
                 spathmesh.vertices[-1].co = [-(sd-(sd-(sd*cos(solalt))))*sin(solazi), -(sd-(sd-(sd*cos(solalt))))*cos(solazi), sd*sin(solalt)]
                 if spathmesh.vertices[-1].co.z >= 0 and doy in (172, 355):
@@ -843,14 +844,13 @@ class NODE_OT_Shadow(bpy.types.Operator):
 
         fdiff =  1 if simnode['Animation'] == 'Static' else scene.frame_end - scene.frame_start + 1
         locnode = simnode.inputs[0].links[0].from_node
-        epwlatilongi(scene, locnode)
         time = datetime.datetime(datetime.datetime.now().year, locnode.startmonth, 1, simnode.starthour - 1)
         y =  datetime.datetime.now().year if locnode.endmonth >= locnode.startmonth else datetime.datetime.now().year + 1
         endtime = datetime.datetime(y, locnode.endmonth, (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[locnode.endmonth - 1], simnode.endhour - 1)
         interval = datetime.timedelta(hours = modf(simnode.interval)[0], minutes = 60 * modf(simnode.interval)[1])
         while time <= endtime:
             if simnode.starthour <= time.hour <= simnode.endhour:
-                beta, phi = solarPosition(time.timetuple().tm_yday, time.hour+time.minute/60, scene.latitude, scene.longitude)[2:]
+                beta, phi = solarPosition(time.timetuple().tm_yday, time.hour+time.minute/60, locnode.latitude, locnode.longitude)[2:]
                 if beta > 0:
                     direcs.append(mathutils.Vector((-sin(phi), -cos(phi), tan(beta))))
             time += interval
@@ -869,7 +869,6 @@ class NODE_OT_Shadow(bpy.types.Operator):
                 for frame in range(scene.fs, scene.fe + 1):
                     scene.frame_set(frame)
                     findex = frame - scene.fs
-#                    if '{}'.format(frame) not in [vc.name for vc in ob.data.vertex_colors]:
                     bpy.ops.mesh.vertex_color_add()
                     ob.data.vertex_colors[-1].name = '{}'.format(frame)
                     vertexColor = ob.data.vertex_colors[-1]

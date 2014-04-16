@@ -41,8 +41,9 @@ def radgexport(export_op, node, **kwargs):
         clearscene(scene, export_op)
         (scene.fs, scene.cfe) = (scene.frame_start, scene.frame_start) if node.animmenu != 'Static' else (0, 0)
     else:
-        (scene.fs, scene.gfe, scene.cfe, node.frames['Material'], node.frames['Geometry'], node.frames['Lights']) = [kwargs['genframe']] * 6 if kwargs.get('genframe') else (0, 0, 0, 0, 0, 0)
-
+        (scene.fs, scene.gfe, node['frames']['Material'], node['frames']['Geometry'], node['frames']['Lights']) = [kwargs['genframe']] * 5 if kwargs.get('genframe') else (0, 0, 0, 0, 0)
+        scene.cfe = 0
+        
     for frame in range(scene.fs, scene.gfe + 1):        
         if export_op.nodeid.split('@')[0] == 'LiVi Geometry':
             scene.frame_set(frame)
@@ -90,22 +91,12 @@ def radgexport(export_op, node, **kwargs):
                                 objcmd = ''
                         objrun = Popen(objcmd, shell = True, stdout = PIPE, stderr=STDOUT)
                         
-#                       if objrun.stderr:
-#                            print(str(objrun.stderr))
-                            
-                        
                         for line in objrun.stdout:
                             if 'non-triangle' in line.decode():
                                 export_op.report({'INFO'}, o.name+" has an incompatible mesh. Doing a simplified export")
                                 o['merr'] = 1
                                 break
-                                
-#                        for line in objrun.stderr:
-#                            print('hi', line.decode())
-#                            if 'fatal' in line.decode() or 'non-triangle' in line.decode():
-#                                export_op.report({'INFO'}, o.name+" has an incompatible obj file. Doing a simplified export")
-#                                o['merr'] = 1
-#                                break
+
                         o.select = False
     
                 if o.get('merr') != 1:
@@ -156,8 +147,6 @@ def radgexport(export_op, node, **kwargs):
     node['radfiles'] = radfilelist
     connode = node.outputs['Geometry out'].links[0].to_node if node.outputs['Geometry out'].is_linked else 0
 
-    node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
-
     for frame in range(scene.fs, scene.gfe + 1):
         fexport(scene, frame, export_op, node, connode)
 
@@ -168,7 +157,7 @@ def radgexport(export_op, node, **kwargs):
         for o, geo in enumerate(geos):
             if len(geo.data.materials) > 0:
                 if len([f for f in geo.data.polygons if geo.data.materials[f.material_index].livi_sense]) > 0:
-                    geo['licalc'], cverts, obcalcverts, csv, csf, scene.objects.active = 1, [], [], [], [], geo
+                    geo['licalc'], cverts, csf, scene.objects.active = 1, [], [], geo
                     bpy.ops.object.mode_set(mode = 'EDIT')
                     bpy.ops.mesh.select_all(action='DESELECT')
                     bpy.ops.object.mode_set(mode = 'OBJECT')
@@ -179,12 +168,11 @@ def radgexport(export_op, node, **kwargs):
                         if mesh.materials[face.material_index].livi_sense:
                             face.select, vsum,  = True, Vector((0, 0, 0))
                             csf.append(face.index)
-                            reslen += 1
-
                             if node.cpoint == '0':
                                 for v in face.vertices:
                                     vsum += mesh.vertices[v].co
                                 fc = vsum/len(face.vertices)
+                                reslen += 1
                                 rtrace.write('{0[0]} {0[1]} {0[2]} {1[0]} {1[1]} {1[2]} \n'.format(fc, face.normal.normalized()[:]))
                             else:
                                 for v,vert in enumerate(face.vertices):
@@ -216,12 +204,7 @@ def radcexport(export_op, node):
 
     if node.bl_label != 'LiVi CBDM':
         if node.skynum < 4:
-            if node.skynum == 3:
-                locnode = 0
-#                subprocess.call("gensky -ang {} {} {} > {}".format(45, 0, node.skytypeparams, retsky(0, node, geonode)), shell = True)
-            else:
-                locnode = node.inputs['Location in'].links[0].from_node
-            
+            locnode = 0 if node.skynum == 3 else node.inputs['Location in'].links[0].from_node            
             for frame in range(scene.fs, scene.cfe + 1):
                 sunexport(scene, node, geonode, locnode, frame - scene.fs)
                 if node.skynum < 2 and node.analysismenu != '2':
@@ -296,8 +279,8 @@ def radcexport(export_op, node):
                     node['whitesky'] = "void glow sky_glow \n0 \n0 \n4 1 1 1 0 \nsky_glow source sky \n0 \n0 \n4 0 0 1 180 \nvoid glow ground_glow \n0 \n0 \n4 1 1 1 0 \nground_glow source ground \n0 \n0 \n4 0 0 -1 180\n\n"
                     oconvcmd = "oconv -w - > {0}-whitesky.oct".format(geonode.filebase)
                     Popen(oconvcmd, shell = True, stdin = PIPE, stdout=PIPE, stderr=STDOUT).communicate(input = node['whitesky'].encode('utf-8'))
-                    subprocess.call("vwrays -ff -x 600 -y 600 -vta -vp 0 0 0 -vd 0 1 0 -vu 0 0 1 -vh 360 -vv 360 -vo 0 -va 0 -vs 0 -vl 0 | rcontrib -bn 146 -fo -ab 0 -ad 1 -n {} -ffc -x 600 -y 600 -ld- -V+ -f tregenza.cal -b tbin -o p%d.hdr -m sky_glow {}-whitesky.oct".format(geonode.nproc, geonode.filename), shell = True)
-                    if int(node.analysismenu) < 2:
+                    if int(node.analysismenu) < 2 or node.hdr:
+                        subprocess.call("vwrays -ff -x 600 -y 600 -vta -vp 0 0 0 -vd 0 1 0 -vu 0 0 1 -vh 360 -vv 360 -vo 0 -va 0 -vs 0 -vl 0 | rcontrib -bn 146 -fo -ab 0 -ad 1 -n {} -ffc -x 600 -y 600 -ld- -V+ -f tregenza.cal -b tbin -o p%d.hdr -m sky_glow {}-whitesky.oct".format(geonode.nproc, geonode.filename), shell = True)
                         for j in range(0, 146):
                             subprocess.call("pcomb -s {0} p{1}.hdr > ps{1}.hdr".format(vals[j], j), shell = True)
                             subprocess.call("{0}  p{1}.hdr".format(geonode.rm, j), shell = True)        
@@ -305,7 +288,7 @@ def radcexport(export_op, node):
                         subprocess.call(geonode.rm+" ps*.hdr" , shell = True)
                         node.hdrname = geonode.newdir+os.path.sep+epwbase[0]+".hdr"
                     
-                    if node.sourcemenu == '0' and node.hdr:
+                    if node.hdr:
                         Popen("oconv -w - > {}{}{}.oct".format(geonode.newdir, os.path.sep, epwbase[0]), shell = True, stdin = PIPE, stdout=PIPE, stderr=STDOUT).communicate(input = hdrsky(geonode.newdir+os.path.sep+epwbase[0]+".hdr").encode('utf-8'))
                         subprocess.call('cnt 750 1500 | rcalc -f "'+os.path.join(scene.vipath, 'lib', 'latlong.cal"')+' -e "XD=1500;YD=750;inXD=0.000666;inYD=0.001333" | rtrace -af pan.af -n {} -x 1500 -y 750 -fac "{}{}{}.oct" > '.format(geonode.nproc, geonode.newdir, os.path.sep, epwbase[0]) + '"'+os.path.join(geonode.newdir, epwbase[0]+'p.hdr')+'"', shell=True)
                 else:
@@ -313,7 +296,10 @@ def radcexport(export_op, node):
                     return
             if node.hdrname not in bpy.data.images:
                 bpy.data.images.load(node.hdrname)
-            node['skyfiles'] = [hdrsky(node.hdrname)]
+            
+            if int(node.analysismenu) < 2:
+                node['skyfiles'] = [hdrsky(node.hdrname)]
+    
     scene.fe = max(scene.cfe, scene.gfe)
     for frame in range(scene.fs, scene.fe + 1):
         fexport(scene, frame, export_op, node, geonode)
@@ -323,7 +309,7 @@ def radcexport(export_op, node):
 def sunexport(scene, node, geonode, locnode, frame): 
     if locnode:
         simtime = node.starttime + frame*datetime.timedelta(seconds = 3600*node.interval)
-        solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, locnode.latitude, locnode.longitude)
+        solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, locnode['latitude'], locnode['longitude'])
         subprocess.call("gensky -ang {} {} {} > {}".format(solalt, solazi, node.skytypeparams, retsky(frame, node, geonode)), shell = True)
     else:
         subprocess.call("gensky -ang {} {} {} > {}".format(45, 0, node.skytypeparams, retsky(0, node, geonode)), shell = True)
@@ -376,7 +362,7 @@ def fexport(scene, frame, export_op, node, othernode, **kwargs):
     pt = 0.2 if not kwargs.get('pause') else 0.5
     (geonode, connode) = (node, othernode) if 'LiVi Geometry' in node.bl_label else (othernode, node)
     
-    if not connode or not connode.get('frames'):
+    if not connode or not connode.get('skyfiles'):
         radtext = geonode['radfiles'][0] if scene.gfe == 0 else geonode['radfiles'][frame]
     elif connode:
         skyframe = frame if scene.cfe > 0 else 0
