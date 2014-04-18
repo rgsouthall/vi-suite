@@ -43,9 +43,10 @@ def rad_prev(prev_op, simnode, connode, geonode, simacc):
             rvurun = Popen(rvucmd, shell = True, stdout=PIPE, stderr=STDOUT)
             for l,line in enumerate(rvurun.stdout):            
                 if 'octree' in line.decode() or 'mesh' in line.decode():
-                    print(line.decode() + ' rerunning export')
-                    radfexport(scene, prev_op, connode, geonode, [scene.frame_current])
-                    rad_prev(prev_op, simnode, connode, geonode, simacc)
+#                    print(line.decode() + ' rerunning export')
+#                    radfexport(scene, prev_op, connode, geonode, [scene.frame_current])
+#                    rad_prev(prev_op, simnode, connode, geonode, simacc)
+                    prev_op.report({'ERROR'}, "Something wrong with the Radiance input files. Try rerunning the geometry and context export")
                     return
         else:
             prev_op.report({'ERROR'}, "There is no camera in the scene. Radiance preview will not work")
@@ -187,6 +188,7 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
                         geo['oreslist'][str(frame)] = obres 
                                    
         if not kwargs:
+            
             resapply(calc_op, res, svres, simnode, connode, geonode)
             vi_func.vcframe('', scene, [ob for ob in scene.objects if ob.get('licalc')] , simnode['Animation'])
         else:
@@ -229,7 +231,7 @@ def resapply(calc_op, res, svres, simnode, connode, geonode):
                 if geo.get('wattres'):
                     del geo['wattres']
                 
-                fend = f + len(geofaces)
+                fend = fstart + len(geofaces)
                 passarea = 0
                 vi_func.selobj(scene, geo)
                 bpy.ops.mesh.vertex_color_add()
@@ -484,7 +486,7 @@ def resapply(calc_op, res, svres, simnode, connode, geonode):
                             comps[frame].append(min(res[frame][fstart:fend]))
 
                         elif c[0] == 'Ratio':
-                            if min(res[frame])/(sum(res[frame][fstart:fend])/len(res[frame])) >= c[3]:
+                            if min(res[frame][fstart:fend])/(sum(res[frame][fstart:fend])/(fend - fstart)) >= c[3]:
                                 comps[frame].append(1)
                             else:
                                 comps[frame].append(0)
@@ -584,7 +586,7 @@ def li_glare(calc_op, simnode, connode, geonode):
         for frame in range(scene.fs, scene.fe + 1):
             time = datetime.datetime(2014, 1, 1, connode.shour, 0) + datetime.timedelta(connode.sdoy - 1) if connode.animmenu == '0' else \
             datetime.datetime(2014, 1, 1, int(connode.shour), int(60*(connode.shour - int(connode.shour)))) + datetime.timedelta(connode.sdoy - 1) + datetime.timedelta(hours = int(connode.interval*(frame-scene.frame_start)), seconds = int(60*(connode.interval*(frame-scene.frame_start) - int(connode.interval*(frame-scene.frame_start)))))
-            glarecmd = "rpict -w -vth -vh 180 -vv 180 -x 800 -y 800 -vd {0[0][2]} {0[1][2]} {0[2][2]} -vp {1[0]} {1[1]} {1[2]} {2} {3}-{5}.oct | evalglare -c {4}.hdr".format(-1*cam.matrix_world, cam.location, simnode['params'], geonode.filebase, os.path.join(geonode.newdir, 'glare'+str(frame)), frame)               
+            glarecmd = "rpict -w -vth -vh 180 -vv 180 -x 800 -y 800 -vd {0[0][2]} {0[1][2]} {0[2][2]} -vp {1[0]} {1[1]} {1[2]} {2} {3}-{5}.oct | evalglare -c {4}.hdr".format(-1*cam.matrix_world, cam.location, simnode['radparams'], geonode.filebase, os.path.join(geonode.newdir, 'glare'+str(frame)), frame)               
             glarerun = Popen(glarecmd, shell = True, stdout = PIPE)
             glaretf = open(geonode.filebase+".glare", "w")
             for line in glarerun.stdout:

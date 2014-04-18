@@ -593,7 +593,7 @@ def sunpath():
     if 0 in (sun['solhour'] == scene.solhour, sun['solday'] == scene.solday, sun['soldistance'] == scene.soldistance):
         sunob = [ob for ob in scene.objects if ob.get('VIType') == 'SunMesh'][0]
         spathob = [ob for ob in scene.objects if ob.get('VIType') == 'SPathMesh'][0]
-        beta, phi = solarPosition(scene.solday, scene.solhour, scene.latitude, scene.longitude)[2:]
+        beta, phi = solarPosition(scene.solday, scene.solhour, scene['latitude'], scene['longitude'])[2:]
         sunob.location.z = sun.location.z = spathob.location.z + scene.soldistance * sin(beta)
         sunob.location.x = sun.location.x = spathob.location.x -(scene.soldistance**2 - (sun.location.z-spathob.location.z)**2)**0.5  * sin(phi)
         sunob.location.y = sun.location.y = spathob.location.y -(scene.soldistance**2 - (sun.location.z-spathob.location.z)**2)**0.5 * cos(phi)
@@ -608,12 +608,12 @@ def sunpath():
                     bpy.data.worlds['World'].node_tree.nodes['Sky Texture'].sun_direction = -sin(phi), -cos(phi), sin(beta)
             if sun.data.node_tree:
                 for blnode in [node for node in sun.data.node_tree.nodes if node.bl_label == 'Blackbody']:
-                    blnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
+                    blnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5 if beta > 0 else 2000
                 for emnode in [node for node in sun.data.node_tree.nodes if node.bl_label == 'Emission']:
-                    emnode.inputs[1].default_value = 5 * sin(beta)
+                    emnode.inputs[1].default_value = 5 * sin(beta) if beta > 0 else 0
             if sunob.data.materials[0].node_tree:
                 for smblnode in [node for node in sunob.data.materials[0].node_tree.nodes if sunob.data.materials and node.bl_label == 'Blackbody']:
-                    smblnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
+                    smblnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5 if beta > 0 else 2000
             if skysphere and not skysphere.hide and skysphere.data.materials[0].node_tree:
                 if 'Sky Texture' in [no.bl_label for no in skysphere.data.materials[0].node_tree.nodes]:
                     skysphere.data.materials[0].node_tree.nodes['Sky Texture'].sun_direction = sin(phi), -cos(phi), sin(beta)

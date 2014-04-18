@@ -191,8 +191,7 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
 
     def invoke(self, context, event):
         node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
-        scene = context.scene
-        scene.li_compliance = 1 if node.bl_label == 'LiVi Compliance' else 0
+        scene = context.scene        
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
         scene.frame_start = 0
         scene.frame_set(0)
@@ -209,9 +208,10 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
             if " " not in bpy.data.filepath:
                 if (node.bl_label == 'LiVi CBDM' and node.inputs['Geometry in'].is_linked and (node.inputs['Location in'].is_linked or node.sm != '0')) \
                 or (node.bl_label != 'LiVi CBDM' and node.inputs['Geometry in'].is_linked):
+                    node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
+                    scene.li_compliance = 1 if node.bl_label == 'LiVi Compliance' else 0
                     radcexport(self, node)
                     node.exported = True
-                    node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
                     node.outputs['Context out'].hide = False
                 else:
                     self.report({'ERROR'},"Required input nodes are not linked")
@@ -495,6 +495,7 @@ class NODE_OT_SunPath(bpy.types.Operator):
         locnode = node.inputs[0].links[0].from_node
         scene, scene.resnode, scene.restree = context.scene, node.name, self.nodeid.split('@')[1]
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 1, 1, 0, 0, 0, 0, 0
+        scene['latitude'], scene['longitude'] = locnode['latitude'], locnode['longitude']
 
         if 'SolEquoRings' not in [mat.name for mat in bpy.data.materials]:
             bpy.data.materials.new('SolEquoRings')
@@ -563,7 +564,7 @@ class NODE_OT_SunPath(bpy.types.Operator):
         for doy in range(0, 363):
             if (doy-4)%7 == 0:
                 for hour in range(1, 25):
-                    ([solalt, solazi]) = solarPosition(doy, hour, locnode.latitude, locnode.longitude)[2:]
+                    ([solalt, solazi]) = solarPosition(doy, hour, locnode['latitude'], locnode['longitude'])[2:]
                     spathmesh.vertices.add(1)
                     spathmesh.vertices[-1].co = [-(sd-(sd-(sd*cos(solalt))))*sin(solazi), -(sd-(sd-(sd*cos(solalt))))*cos(solazi), sd*sin(solalt)]
 
@@ -580,7 +581,7 @@ class NODE_OT_SunPath(bpy.types.Operator):
 
         for doy in (79, 172, 355):
             for hour in range(1, 25):
-                ([solalt, solazi]) = solarPosition(doy, hour, locnode.latitude, locnode.longitude)[2:]
+                ([solalt, solazi]) = solarPosition(doy, hour, locnode['latitude'], locnode['longitude'])[2:]
                 spathmesh.vertices.add(1)
                 spathmesh.vertices[-1].co = [-(sd-(sd-(sd*cos(solalt))))*sin(solazi), -(sd-(sd-(sd*cos(solalt))))*cos(solazi), sd*sin(solalt)]
                 if spathmesh.vertices[-1].co.z >= 0 and doy in (172, 355):
@@ -708,7 +709,7 @@ class NODE_OT_WindRose(bpy.types.Operator):
             with open(locnode.weather, "r") as epwfile:
                 if locnode.startmonth > locnode.endmonth:
                     self.report({'ERROR'},"Start month is later than end month")
-                    return
+                    return {'FINISHED'}
                 else:
                     wvals = [line.split(",")[20:22] for l, line in enumerate(epwfile.readlines()) if l > 7 and locnode.startmonth <= int(line.split(",")[1]) < locnode.endmonth]
                     simnode['maxres'], simnode['minres'],  simnode['avres']= max([float(w[1]) for w in wvals]), min([float(w[1]) for w in wvals]), sum([float(w[1]) for w in wvals])/len(wvals)
@@ -850,7 +851,7 @@ class NODE_OT_Shadow(bpy.types.Operator):
         interval = datetime.timedelta(hours = modf(simnode.interval)[0], minutes = 60 * modf(simnode.interval)[1])
         while time <= endtime:
             if simnode.starthour <= time.hour <= simnode.endhour:
-                beta, phi = solarPosition(time.timetuple().tm_yday, time.hour+time.minute/60, locnode.latitude, locnode.longitude)[2:]
+                beta, phi = solarPosition(time.timetuple().tm_yday, time.hour+time.minute/60, locnode['latitude'], locnode['longitude'])[2:]
                 if beta > 0:
                     direcs.append(mathutils.Vector((-sin(phi), -cos(phi), tan(beta))))
             time += interval
@@ -866,9 +867,8 @@ class NODE_OT_Shadow(bpy.types.Operator):
 
                 while ob.data.vertex_colors:
                     bpy.ops.mesh.vertex_color_remove()
-                for frame in range(scene.fs, scene.fe + 1):
+                for findex, frame in enumerate(range(scene.fs, scene.fe + 1)):
                     scene.frame_set(frame)
-                    findex = frame - scene.fs
                     bpy.ops.mesh.vertex_color_add()
                     ob.data.vertex_colors[-1].name = '{}'.format(frame)
                     vertexColor = ob.data.vertex_colors[-1]
@@ -896,17 +896,17 @@ class NODE_OT_Shadow(bpy.types.Operator):
                 ob['omax'] = {str(f):obmaxres[f - scene.fs] for f in framerange(scene, simnode.animmenu)}
                 ob['omin'] = {str(f):obminres[f - scene.fs] for f in framerange(scene, simnode.animmenu)}
                 ob['oave'] = {str(f):obavres[f - scene.fs] for f in framerange(scene, simnode.animmenu)}
-                ob['oreslist'] = {str(f):[sh[2] for sh in shadcentres[f - scene.fs]] for f in framerange(scene, simnode.animmenu)}
+                ob['oreslist'] = {str(f):[100*sh[2] for sh in shadcentres[f - scene.fs]] for f in framerange(scene, simnode.animmenu)}
             
             else:
                ob.licalc = 0
         vcframe('', scene, obcalclist, simnode.animmenu)
         try:
-            simnode['maxres'], simnode['minres'], simnode['avres'] = scmaxres, scminres, [scavres[f]/len([ob for ob in scene.objects if ob.licalc]) for f in range(fdiff)]
+#            simnode['maxres'], simnode['minres'], simnode['avres'] = scmaxres, scminres, [scavres[f]/len([ob for ob in scene.objects if ob.licalc]) for f in range(fdiff)]
+            simnode['maxres'], simnode['minres'], simnode['avres'] = [100]*fdiff, [0]*fdiff, [scavres[f]/len([ob for ob in scene.objects if ob.licalc]) for f in range(fdiff)]
         except ZeroDivisionError:
             self.report({'ERROR'},"No objects have a VI Shadow material attached.")
 
         scene.frame_set(scene.fs)
-        if simnode.bl_label[0] == '*':
-            simnode.bl_label = simnode.bl_label[1:]
+        simnode.bl_label = simnode.bl_label[1:] if simnode.bl_label[0] == '*' else simnode.bl_label
         return {'FINISHED'}

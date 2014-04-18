@@ -194,7 +194,7 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
                         break
 
         total_mat = view_mat*ob_mat
-        if cp == "0" or not geonode:
+        if cp == "0" or not geonode:            
             for f in faces:
                 vsum = mathutils.Vector((0, 0, 0))
                 for v in f.vertices:
@@ -209,13 +209,13 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
                                 val = abs(min(simnode['minres']) + (1 - (1.333333*colorsys.rgb_to_hsv(*[col[i]/255 for i in range(3)])[0]))*(maxval - minval))
                                 vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, ('{:.1f}', '{:.0f}')[val > 100].format(val), total_mat*fc.to_4d())
                             else:
-                                vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, '{:.0f}'.format(abs(minval + (col[0])*(maxval - minval))), total_mat*fc.to_4d())
+                                vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, '{:.0f}'.format(abs(col[0]*100)), total_mat*fc.to_4d())
         elif cp == "1":
             for v, vert in enumerate(verts):
                 vpos = ob.active_shape_key.data[vert.index].co if len(obreslist) > 0 else vert.co
                 if len(set(obm.vertex_colors[fn].data[vert.index].color[:])) > 0:
                     if (total_mat*vpos)[2] > 0:
-                        vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, int((1 - (1.333333*colorsys.rgb_to_hsv(obm.vertex_colors[fn].data[loops[v]].color[0]/255, obm.vertex_colors[fn].data[loops[v]].color[1]/255, obm.vertex_colors[fn].data[loops[v]].color[2]/255)[0]))*max(simnode['maxres'])), total_mat*vpos.to_4d())
+                        vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, ('{:.1f}', '{:.0f}')[max(simnode['maxres']) > 100].format(abs(min(simnode['minres']) + int((1 - (1.333333*colorsys.rgb_to_hsv(obm.vertex_colors[fn].data[loops[v]].color[0]/255, obm.vertex_colors[fn].data[loops[v]].color[1]/255, obm.vertex_colors[fn].data[loops[v]].color[2]/255)[0]))*(max(simnode['maxres']) - min(simnode['minres']))))), total_mat*vpos.to_4d())
     blf.disable(0, 4)
 
 def li3D_legend(self, context, simnode, connode, geonode):
@@ -317,6 +317,7 @@ def viwr_legend(self, context, simnode):
 def li_compliance(self, context, connode):
     height, scene = context.region.height, context.scene
     if not scene.get('li_compliance') or scene.frame_current not in range(scene.fs, scene.fe + 1) or scene.vi_display == 0:
+        print('return')
         return
     if connode.analysismenu == '0':
         buildtype = ('School', 'Higher Education', 'Healthcare', 'Residential', 'Retail', 'Office & Other')[int(connode.bambuildmenu)]

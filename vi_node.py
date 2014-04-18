@@ -54,10 +54,7 @@ class ViGExLiNode(bpy.types.Node, ViNodes):
         if self.bl_label[0] != '*':
             self.bl_label = '*'+self.bl_label
         self.outputs['Generative out'].hide = True if self.animmenu != 'Static' else False       
-        for mglfr in self['frames']:
-            self['frames'][mglfr] = context.scene.frame_end if self.animmenu == mglfr else 0
-        context.scene.gfe = max(self['frames'].values())
-
+        
     animtype = [('Static', "Static", "Simple static analysis"), ('Geometry', "Geometry", "Animated geometry analysis"), ('Material', "Material", "Animated material analysis"), ('Lights', "Lights", "Animated artificial lighting analysis")]
     animmenu = bpy.props.EnumProperty(name="", description="Animation type", items=animtype, default = 'Static', update = nodeexported)
     cpoint = bpy.props.EnumProperty(items=[("0", "Faces", "Export faces for calculation points"),("1", "Vertices", "Export vertices for calculation points"), ],
@@ -135,7 +132,7 @@ class ViLiNode(bpy.types.Node, ViNodes):
         self['hours'] = (self.endtime-self.starttime).days*24 + (self.endtime-self.starttime).seconds/3600
         self['frames']['Time'] = scene.cfe = scene.fs + int(self['hours']/self.interval)
         self['resname'] = ("illumout", "irradout", "dfout", '')[int(self.analysismenu)] 
-        self['unit'] = ("Lux", "W/m"+ u'\u00b2', "DF %")[int(self.analysismenu)]
+        self['unit'] = ("Lux", "W/m"+ u'\u00b2', "DF %", '')[int(self.analysismenu)]
 
     analysismenu = bpy.props.EnumProperty(name="", description="Type of lighting analysis", items = analysistype, default = '0', update = nodeexported)
     simalg = bpy.props.StringProperty(name="", description="Algorithm to run on the radiance results", default=" |  rcalc  -e '$1=47.4*$1+120*$2+11.6*$3' " if str(sys.platform) != 'win32' else ' |  rcalc  -e "$1=47.4*$1+120*$2+11.6*$3" ')

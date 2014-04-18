@@ -1,10 +1,5 @@
 import bpy
-from .vi_func import radmat
-
-def newrow(layout, s1, root, s2):
-    row = layout.row()
-    row.label(s1)
-    row.prop(root, s2)
+from .vi_func import radmat, newrow
 
 from .envi_mat import envi_materials, envi_constructions
 envi_mats = envi_materials()
@@ -17,14 +12,13 @@ class Vi3DPanel(bpy.types.Panel):
     bl_region_type = "UI"
 
     def draw(self, context):
-        if context.scene.vi_display == 1:
-            view = context.space_data
-            scene = context.scene
+        scene = context.scene
+        if scene.vi_display == 1:
+            view = context.space_data            
             layout = self.layout
 
             if scene.wr_disp_panel == 1:
-                row = layout.row()
-                row.prop(scene, "vi_leg_display")
+                newrow(layout, 'Legend', scene, "vi_leg_display")
 
             if scene.sp_disp_panel == 1:
                 for i in (("Day of year:", "solday"), ("Hour of year:", "solhour"), ("Sunpath scale:", "soldistance"), ("Display hours:", "hourdisp")):
@@ -45,8 +39,10 @@ class Vi3DPanel(bpy.types.Panel):
                 if scene.ss_disp_panel == 2 or scene.li_disp_panel == 2:
                     row = layout.row()
                     row.prop(view, "show_only_render")
-                    row = layout.row()
-                    row.prop(scene, "vi_leg_display")
+                    newrow(layout, 'Legend', scene, "vi_leg_display")
+#                    row = layout.row()
+#                    row.label(text = 'Legend')
+#                    row.prop(scene, "vi_leg_display")
                     if scene.render.engine == 'BLENDER_RENDER' and context.active_object and context.active_object.type == 'MESH':
                         row = layout.row()
                         row.prop(context.active_object, "show_wire")
@@ -72,6 +68,7 @@ class Vi3DPanel(bpy.types.Panel):
                         newrow(layout, "Assesment individiual:", scene, "li_assind")
                         newrow(layout, "Job number:", scene, "li_jobno")
                         newrow(layout, "Project name:", scene, "li_projname")
+            newrow(layout, 'Display active', scene, 'vi_display')
 
 
 class VIMatPanel(bpy.types.Panel):

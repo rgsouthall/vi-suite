@@ -492,7 +492,7 @@ def register():
     Scene.en_disp_panel = bprop("", "",False)
     Scene.li_compliance = bprop("", "", False)
     Scene.vi_display_rp = bprop("", "", False)
-    Scene.vi_leg_display = bprop("Legend", "", False)
+    Scene.vi_leg_display = bprop("", "", False)
     Scene.vi_display_sel_only = bprop("", "", False)
     Scene.vi_display_vis_only = bprop("", "", False)
     Scene.vi_display_rp_fs = iprop("", "Point result font size", 4, 48, 9)
