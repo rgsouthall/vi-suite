@@ -257,6 +257,7 @@ class NODE_OT_LiViCalc(bpy.types.Operator):
         simnode = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
         connode = simnode.inputs['Context in'].links[0].from_node
         geonode = connode.inputs['Geometry in'].links[0].from_node
+        scene['LiViContext'] = connode.bl_label
         
         for geo in retobjs('livig'):
             geo.licalc = any([m.livi_sense for m in geo.data.materials])
@@ -308,7 +309,11 @@ class VIEW3D_OT_LiDisplay(bpy.types.Operator):
             bpy.types.SpaceView3D.draw_handler_remove(self._handle_leg, 'WINDOW')
             bpy.types.SpaceView3D.draw_handler_remove(self._handle_pointres, 'WINDOW')
             if context.scene.get('LiViContext') == 'LiVi Compliance':
-                bpy.types.SpaceView3D.draw_handler_remove(self._handle_comp, 'WINDOW')
+                try:
+                    bpy.types.SpaceView3D.draw_handler_remove(self._handle_comp, 'WINDOW')
+                except:
+                    pass
+                context.scene.li_compliance = 0
             return {'CANCELLED'}
         return {'PASS_THROUGH'}
 

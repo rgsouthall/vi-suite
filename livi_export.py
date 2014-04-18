@@ -198,7 +198,6 @@ def radgexport(export_op, node, **kwargs):
 
 def radcexport(export_op, node):
     skyfileslist, scene, scene.li_disp_panel, scene.vi_display = [], bpy.context.scene, 0, 0
-    scene['LiViContext'] = node.bl_label
     clearscene(scene, export_op)
     geonode = node.inputs['Geometry in'].links[0].from_node
 
