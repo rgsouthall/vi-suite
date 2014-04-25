@@ -32,10 +32,7 @@ except:
 
 def radgexport(export_op, node, **kwargs):
     scene = bpy.context.scene
-    
-    if bpy.context.active_object and bpy.context.active_object.type == 'MESH' and bpy.context.active_object.hide == 0:
-        bpy.ops.object.mode_set()
-    radfilelist = []
+    radfiles = []
 
     if export_op.nodeid.split('@')[0] == 'LiVi Geometry':
         clearscene(scene, export_op)
@@ -142,9 +139,9 @@ def radgexport(export_op, node, **kwargs):
                             fz = sum([(spotmatrix*v.co)[2] for v in geo.data.vertices if v.index in face.vertices])/len(face.vertices)
                             lradfile += "!xform -rx {:.3f} -ry {:.3f} -rz {:.3f} -t {:.3f} {:.3f} {:.3f} {}\n".format((180/pi)*rotation[0], (180/pi)*rotation[1], (180/pi)*rotation[2], fx, fy, fz, node.newdir+os.path.sep+iesname+"-"+str(frame)+".rad")
         sradfile = "# Sky \n\n"
-        radfilelist.append(mradfile+gradfile+lradfile+sradfile)
-
-    node['radfiles'] = radfilelist
+        radfiles.append(mradfile+gradfile+lradfile+sradfile)
+    
+    node['radfiles'] = radfiles
     connode = node.outputs['Geometry out'].links[0].to_node if node.outputs['Geometry out'].is_linked else 0
 
     for frame in range(scene.fs, scene.gfe + 1):
@@ -391,51 +388,52 @@ def fexport(scene, frame, export_op, node, othernode, **kwargs):
 def cyfc1(self):
     if bpy.data.scenes[0].render.engine == "CYCLES":
         scene = bpy.context.scene
-        for material in bpy.data.materials:
-            if material.use_nodes == 1:
-                try:
-                    if material.livi_sense or material.vi_shadow and material.node_tree.nodes.get('Attribute'):
-                        material.node_tree.nodes["Attribute"].attribute_name = str(scene.frame_current)
-                except Exception as e:
-                    print(e, 'Something wrong with changing the material attribute name')
+        if 'LiVi' in scene.resnode or 'Shadow' in scene.resnode:
+            for material in bpy.data.materials:
+                if material.use_nodes == 1:
+                    try:
+                        if material.livi_sense or material.vi_shadow and material.node_tree.nodes.get('Attribute'):
+                            material.node_tree.nodes["Attribute"].attribute_name = str(scene.frame_current)
+                    except Exception as e:
+                        print(e, 'Something wrong with changing the material attribute name')
 
-        if bpy.data.worlds.get('World'):
-            if bpy.data.worlds["World"].use_nodes == False:
-                bpy.data.worlds["World"].use_nodes = True
-            nt = bpy.data.worlds[0].node_tree
-
-        for ob in scene.objects:
-            if ob.get('VIType') == 'Sun':
-                sun = ob
-            if scene.resnode == 'VI Sun Path':
-                if ob.get('VIType') == 'SunMesh':
-                    sunob = ob
-                if ob.get('VIType') == 'SPathMesh':
-                    spathob = ob
-        
         if scene.resnode == 'VI Sun Path':
-            beta, phi = solarPosition(scene.solday, scene.solhour, locnode.latitude, locnode.longitude)[2:]
-            if nt.nodes.get('Sky Texture'):
-                bpy.data.worlds['World'].node_tree.nodes['Sky Texture'].sun_direction = -sin(phi), -cos(phi), sin(beta)
-            spathob.scale = 3 * [scene.soldistance/100]
-            sunob.scale = 3*[scene.soldistance/100]
-            sunob.location.z = sun.location.z = spathob.location.z + scene.soldistance * sin(beta)
-            sunob.location.x = sun.location.x = spathob.location.x -(scene.soldistance**2 - (sun.location.z-spathob.location.z)**2)**0.5  * sin(phi)
-            sunob.location.y = sun.location.y = spathob.location.y -(scene.soldistance**2 - (sun.location.z-spathob.location.z)**2)**0.5 * cos(phi)
-            sun.rotation_euler = pi * 0.5 - beta, 0, -phi
-
-            if sun.data.node_tree:
-                for blnode in [node for node in sun.data.node_tree.nodes if node.bl_label == 'Blackbody']:
-                    blnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
-                for emnode in [node for node in sun.data.node_tree.nodes if node.bl_label == 'Emission']:
-                    emnode.inputs[1].default_value = 5 * sin(beta)
-
-            if sunob.data.materials[0].node_tree:
-                for smblnode in [node for node in sunob.data.materials[0].node_tree.nodes if sunob.data.materials and node.bl_label == 'Blackbody']:
-                    smblnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
-
-        bpy.data.worlds[0].use_nodes = 0
-        ti.sleep(0.1)
-        bpy.data.worlds[0].use_nodes = 1
+            spoblist = {ob.get('VIType'):ob for ob in scene.objects if ob.get('VIType') in ('Sun', 'SPathMesh')}
+            beta, phi = solarPosition(scene.solday, scene.solhour, scene['latitude'], scene['longitude'])[2:]
+            if bpy.data.worlds.get('World'):
+                if bpy.data.worlds["World"].use_nodes == False:
+                    bpy.data.worlds["World"].use_nodes = True
+                nt = bpy.data.worlds[0].node_tree
+                if nt.nodes.get('Sky Texture'):
+                    bpy.data.worlds['World'].node_tree.nodes['Sky Texture'].sun_direction = -sin(phi), -cos(phi), sin(beta)
+            for ob in scene.objects:
+                if ob.get('VIType') == 'Sun':
+                    ob.rotation_euler = pi * 0.5 - beta, 0, -phi
+                    if ob.data.node_tree:
+                        for blnode in [blnode for blnode in ob.data.node_tree.nodes if blnode.bl_label == 'Blackbody']:
+                            blnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
+                        for emnode in [emnode for emnode in ob.data.node_tree.nodes if emnode.bl_label == 'Emission']:
+                            emnode.inputs[1].default_value = 5 * sin(beta)
+                
+                elif ob.get('VIType') == 'SPathMesh':
+                    ob.scale = 3 * [scene.soldistance/100]
+                
+                elif ob.get('VIType') == 'SkyMesh':
+                    ont = ob.data.materials['SkyMesh'].node_tree
+                    if ont.nodes.get('Sky Texture'):
+                        ont.nodes['Sky Texture'].sun_direction = sin(phi), -cos(phi), sin(beta)
+                
+                elif ob.get('VIType') == 'SunMesh':
+                    ob.scale = 3*[scene.soldistance/100]
+                    ob.location.z = spoblist['Sun'].location.z = spoblist['SPathMesh'].location.z + scene.soldistance * sin(beta)
+                    ob.location.x = spoblist['Sun'].location.x = spoblist['SPathMesh'].location.x -(scene.soldistance**2 - (spoblist['Sun'].location.z-spoblist['SPathMesh'].location.z)**2)**0.5  * sin(phi)
+                    ob.location.y = spoblist['Sun'].location.y = spoblist['SPathMesh'].location.y -(scene.soldistance**2 - (spoblist['Sun'].location.z-spoblist['SPathMesh'].location.z)**2)**0.5 * cos(phi)
+                    if ob.data.materials[0].node_tree:
+                        for smblnode in [smblnode for smblnode in ob.data.materials[0].node_tree.nodes if ob.data.materials and smblnode.bl_label == 'Blackbody']:
+                            smblnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
+                
+#        bpy.data.worlds[0].use_nodes = 0
+#        ti.sleep(0.1)
+#        bpy.data.worlds[0].use_nodes = 1
     else:
         return

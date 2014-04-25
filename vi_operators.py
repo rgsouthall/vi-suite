@@ -43,7 +43,11 @@ class NODE_OT_LiGExport(bpy.types.Operator):
         scene = context.scene
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
         if bpy.data.filepath and " " not in bpy.data.filepath:
+            if bpy.context.active_object and bpy.context.active_object.type == 'MESH' and not bpy.context.active_object.hide:
+                bpy.ops.object.mode_set()
             node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
+#            node['radfiles'] = []
+            node['frames'] = {'Material': 0, 'Geometry': 0, 'Lights':0} 
             for mglfr in node['frames']:
                 node['frames'][mglfr] = scene.frame_end if node.animmenu == mglfr else 0
                 scene.gfe = max(node['frames'].values())
@@ -500,7 +504,7 @@ class NODE_OT_SunPath(bpy.types.Operator):
         locnode = node.inputs[0].links[0].from_node
         scene, scene.resnode, scene.restree = context.scene, node.name, self.nodeid.split('@')[1]
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 1, 1, 0, 0, 0, 0, 0
-        scene['latitude'], scene['longitude'] = locnode['latitude'], locnode['longitude']
+        scene['latitude'], scene['longitude'] = locnode.retlatlong(context)
 
         if 'SolEquoRings' not in [mat.name for mat in bpy.data.materials]:
             bpy.data.materials.new('SolEquoRings')
@@ -569,7 +573,7 @@ class NODE_OT_SunPath(bpy.types.Operator):
         for doy in range(0, 363):
             if (doy-4)%7 == 0:
                 for hour in range(1, 25):
-                    ([solalt, solazi]) = solarPosition(doy, hour, locnode['latitude'], locnode['longitude'])[2:]
+                    ([solalt, solazi]) = solarPosition(doy, hour, scene['latitude'], scene['longitude'])[2:]
                     spathmesh.vertices.add(1)
                     spathmesh.vertices[-1].co = [-(sd-(sd-(sd*cos(solalt))))*sin(solazi), -(sd-(sd-(sd*cos(solalt))))*cos(solazi), sd*sin(solalt)]
 
@@ -586,7 +590,7 @@ class NODE_OT_SunPath(bpy.types.Operator):
 
         for doy in (79, 172, 355):
             for hour in range(1, 25):
-                ([solalt, solazi]) = solarPosition(doy, hour, locnode['latitude'], locnode['longitude'])[2:]
+                ([solalt, solazi]) = solarPosition(doy, hour, scene['latitude'], scene['longitude'])[2:]
                 spathmesh.vertices.add(1)
                 spathmesh.vertices[-1].co = [-(sd-(sd-(sd*cos(solalt))))*sin(solazi), -(sd-(sd-(sd*cos(solalt))))*cos(solazi), sd*sin(solalt)]
                 if spathmesh.vertices[-1].co.z >= 0 and doy in (172, 355):

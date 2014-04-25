@@ -47,7 +47,6 @@ class ViGExLiNode(bpy.types.Node, ViNodes):
     (filepath, filename, filedir, newdir, filebase, objfilebase, nodetree, nproc, rm, cp, cat, fold) = (bpy.props.StringProperty() for x in range(12))
     reslen = bpy.props.IntProperty(default = 0)
     exported = bpy.props.BoolProperty()
-    radfiles = []
 
     def nodeexported(self, context):
         self.exported = False
@@ -59,20 +58,18 @@ class ViGExLiNode(bpy.types.Node, ViNodes):
     animmenu = bpy.props.EnumProperty(name="", description="Animation type", items=animtype, default = 'Static', update = nodeexported)
     cpoint = bpy.props.EnumProperty(items=[("0", "Faces", "Export faces for calculation points"),("1", "Vertices", "Export vertices for calculation points"), ],
             name="", description="Specify the calculation point geometry", default="1", update = nodeexported)
-    buildstorey = bpy.props.EnumProperty(items=[("0", "Single", "Single storey building"),("1", "Multi", "Multi-storey building")], name="", description="Building storeys", default="0", update = nodeexported)
 
     def init(self, context):   
         self.outputs.new('ViGen', 'Generative out')
         self.outputs.new('ViLiG', 'Geometry out')
         self.outputs['Geometry out'].hide = True
         self['nodeid'] = nodeid(self, bpy.data.node_groups)
-        self['frames'] = {'Material': 0, 'Geometry': 0, 'Lights':0}        
+     
         if bpy.data.filepath:
             nodeinit(self)
         bpy.context.scene.gfe = 0
                 
     def draw_buttons(self, context, layout):
-        newrow(layout, 'Storeys:', self, 'buildstorey')
         newrow(layout, 'Animation:', self, 'animmenu')
         newrow(layout, 'Result point:', self, 'cpoint')
         row = layout.row()
@@ -376,7 +373,8 @@ class ViLiCNode(bpy.types.Node, ViNodes):
     bambuildmenu = bpy.props.EnumProperty(name="", description="Type of building", items=bambuildtype, default = '0', update = nodeexported)
     cusacc = bpy.props.StringProperty(name="", description="Custom Radiance simulation parameters", default="", update = nodeexported)
     skytypeparams = bpy.props.StringProperty(default = "-b 22.86 -c")
-    
+    buildstorey = bpy.props.EnumProperty(items=[("0", "Single", "Single storey building"),("1", "Multi", "Multi-storey building")], name="", description="Building storeys", default="0", update = nodeexported)
+
     def init(self, context):
         self.inputs.new('ViLiG', 'Geometry in')
         self.outputs.new('ViLiC', 'Context out')
@@ -390,6 +388,7 @@ class ViLiCNode(bpy.types.Node, ViNodes):
         newrow(layout, "Compliance standard:", self, 'analysismenu')
         if self.analysismenu == '0':
             newrow(layout, "Building type:", self, 'bambuildmenu')
+            newrow(layout, "Storeys:", self, 'buildstorey')
         newrow(layout, 'Animation:', self, "animmenu")
         if nodeinputs(self):
             row = layout.row()
@@ -526,19 +525,16 @@ class ViLoc(bpy.types.Node, ViNodes):
     bl_label = 'VI Location'
     bl_icon = 'LAMP'
             
-    def updatelatlong(self, context):
-        if self.loc == '1' and self.weather:
-            self['latitude'], self['longitude'] = epwlatilongi(context.scene, self)
-        else:
-            self['latitude'], self['longitude'] = self.lat, self.long         
+#    def updatelatlong(self, context):
+                 
 
     (filepath, filename, filedir, newdir, filebase, objfilebase, nodetree, nproc, rm , cp, cat, fold) = (bpy.props.StringProperty() for x in range(12))
     epwpath = os.path.dirname(inspect.getfile(inspect.currentframe()))+'/EPFiles/Weather/'
     weatherlist = [((wfile, os.path.basename(wfile).strip('.epw').split(".")[0], 'Weather Location')) for wfile in glob.glob(epwpath+"/*.epw")]
-    weather = bpy.props.EnumProperty(items = weatherlist, name="", description="Weather for this project", update = updatelatlong)
-    loc = bpy.props.EnumProperty(items = [("0", "Manual", "Manual location"), ("1", "EPW ", "Get location from EPW file")], name = "", description = "Location", default = "0", update = updatelatlong)
-    lat = bpy.props.FloatProperty(name="Latitude", description="Site Latitude", min=-90, max=90, default=52, update = updatelatlong)
-    long = bpy.props.FloatProperty(name="Longitude", description="Site Longitude (East is positive, West is negative)", min=-180, max=180, default=0, update = updatelatlong)
+    weather = bpy.props.EnumProperty(items = weatherlist, name="", description="Weather for this project")
+    loc = bpy.props.EnumProperty(items = [("0", "Manual", "Manual location"), ("1", "EPW ", "Get location from EPW file")], name = "", description = "Location", default = "0")
+    lat = bpy.props.FloatProperty(name="Latitude", description="Site Latitude", min=-90, max=90, default=52)
+    long = bpy.props.FloatProperty(name="Longitude", description="Site Longitude (East is positive, West is negative)", min=-180, max=180, default=0)
     maxws = bpy.props.FloatProperty(name="", description="Max wind speed", min=0, max=90, default=0)
     minws = bpy.props.FloatProperty(name="", description="Min wind speed", min=0, max=90, default=0)
     avws = bpy.props.FloatProperty(name="", description="Average wind speed", min=0, max=90, default=0)
@@ -550,8 +546,8 @@ class ViLoc(bpy.types.Node, ViNodes):
         self['nodeid'] = nodeid(self, bpy.data.node_groups)
         bpy.data.node_groups[self['nodeid'].split('@')[1]].use_fake_user = True
         self.outputs.new('ViLoc', 'Location out')
-        self['latitude'] = 52
-        self['longitude'] = 0
+#        self['latitude'] = 52
+#        self['longitude'] = 0
         if bpy.data.filepath:
             nodeinit(self)
         
@@ -576,6 +572,12 @@ class ViLoc(bpy.types.Node, ViNodes):
             row.prop(self, "startmonth")
             row = layout.row()
             row.prop(self, "endmonth")
+    
+    def retlatlong(self, context):
+        if self.loc == '1' and self.weather:
+            return epwlatilongi(context.scene, self)
+        else:
+            return self.lat, self.long
 
 class ViGExEnNode(bpy.types.Node, ViNodes):
     '''Node describing an EnVi Geometry Export'''
