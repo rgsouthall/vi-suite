@@ -36,7 +36,7 @@ def radgexport(export_op, node, **kwargs):
 
     if export_op.nodeid.split('@')[0] == 'LiVi Geometry':
         clearscene(scene, export_op)
-        (scene.fs, scene.cfe) = (scene.frame_start, scene.frame_start) if node.animmenu != 'Static' else (0, 0)
+        scene.fs = scene.frame_start if node.animmenu != 'Static' else 0
     else:
         (scene.fs, scene.gfe, node['frames']['Material'], node['frames']['Geometry'], node['frames']['Lights']) = [kwargs['genframe']] * 5 if kwargs.get('genframe') else (0, 0, 0, 0, 0)
         scene.cfe = 0
@@ -75,14 +75,14 @@ def radgexport(export_op, node, **kwargs):
                     selobj(scene, o)
                     if o.get('merr') != 1:
                         if node.animmenu in ('Geometry'' Material'):# or export_op.nodeid.split('@')[0] == 'LiVi Simulation':
-                            bpy.ops.export_scene.obj(filepath=retobj(o.name, gframe, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
+                            bpy.ops.export_scene.obj(filepath=retobj(o.name, gframe, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=False, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
                             objcmd = "obj2mesh -w -a {} {} {}".format(tempmatfilename, retobj(o.name, gframe, node), retmesh(o.name, max(gframe, mframe), node)) 
                         elif export_op.nodeid.split('@')[0] == 'LiVi Simulation':
-                            bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_start, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
+                            bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_start, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=False, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
                             objcmd = "obj2mesh -w -a {} {} {}".format(retmat(scene.frame_start, node), retobj(o.name, scene.frame_start, node), retmesh(o.name, scene.frame_start, node))
                         else:
                             if frame == scene.fs:                        
-                                bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=True, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
+                                bpy.ops.export_scene.obj(filepath=retobj(o.name, scene.frame_current, node), check_existing=True, filter_glob="*.obj;*.mtl", use_selection=True, use_animation=False, use_mesh_modifiers=True, use_edges=False, use_normals=o.data.polygons[0].use_smooth, use_uvs=True, use_materials=True, use_triangles=False, use_nurbs=True, use_vertex_groups=False, use_blen_objects=True, group_by_object=False, group_by_material=False, keep_vertex_order=False, global_scale=1.0, axis_forward='Y', axis_up='Z', path_mode='AUTO')
                                 objcmd = "obj2mesh -w -a {} {} {}".format(retmat(frame, node), retobj(o.name, scene.frame_current, node), retmesh(o.name, scene.frame_current, node))
                             else:
                                 objcmd = ''
@@ -148,48 +148,49 @@ def radgexport(export_op, node, **kwargs):
         fexport(scene, frame, export_op, node, connode)
 
 # rtrace export routine
-    with open(node.filebase+".rtrace", "w") as rtrace:
-        reslen = 0
-        geos = retobjs('livig') if export_op.nodeid.split('@')[0] == 'LiVi Geometry' else retobjs('livic')
-        for o, geo in enumerate(geos):
-            if len(geo.data.materials) > 0:
-                if len([f for f in geo.data.polygons if geo.data.materials[f.material_index].livi_sense]) > 0:
-                    geo['licalc'], cverts, csf, scene.objects.active = 1, [], [], geo
-                    bpy.ops.object.mode_set(mode = 'EDIT')
-                    bpy.ops.mesh.select_all(action='DESELECT')
-                    bpy.ops.object.mode_set(mode = 'OBJECT')
-                    mesh = geo.to_mesh(scene, True, 'PREVIEW', calc_tessface=False)
-                    mesh.transform(geo.matrix_world)
-                    scene.objects.active = geo
-                    for face in mesh.polygons:
-                        if mesh.materials[face.material_index].livi_sense:
-                            face.select, vsum,  = True, Vector((0, 0, 0))
-                            csf.append(face.index)
-                            if node.cpoint == '0':
-                                for v in face.vertices:
-                                    vsum += mesh.vertices[v].co
-                                fc = vsum/len(face.vertices)
-                                reslen += 1
-                                rtrace.write('{0[0]} {0[1]} {0[2]} {1[0]} {1[1]} {1[2]} \n'.format(fc, face.normal.normalized()[:]))
-                            else:
-                                for v,vert in enumerate(face.vertices):
-                                    if vert not in cverts:
-                                        vcentx, vcenty, vcentz = mesh.vertices[vert].co[:]
-                                        vnormx, vnormy, vnormz = (mesh.vertices[vert].normal*geo.matrix_world.inverted())[:]
-                                        reslen += 1
-                                        rtrace.write('{0[0]} {0[1]} {0[2]} {1[0]} {1[1]} {1[2]} \n'.format(mesh.vertices[vert].co[:], (mesh.vertices[vert].normal*geo.matrix_world.inverted()).normalized()[:]))
-                                        cverts.append(vert)
-                    (geo['cverts'], geo['cfaces']) = (cverts, csf) if node.cpoint == '1' else ([], csf)                    
-                    bpy.data.meshes.remove(mesh)
-                else:
-                    if geo.get('licalc'):
-                        del geo['licalc']
-                    for mat in geo.material_slots:
-                        mat.material.use_transparent_shadows = True
+    
+    reslen, rtpoints = 0, ''
+    geos = retobjs('livig') if export_op.nodeid.split('@')[0] == 'LiVi Geometry' else retobjs('livic')
+    
+    for o, geo in enumerate(geos):
+        if len(geo.data.materials) > 0:
+            if len([f for f in geo.data.polygons if geo.data.materials[f.material_index].livi_sense]) > 0:
+                geo['licalc'], cverts, csfi, scene.objects.active, geo['cfaces'] = 1, [], [], geo, []
+                bpy.ops.object.mode_set(mode = 'EDIT')
+                bpy.ops.mesh.select_all(action='DESELECT')
+                bpy.ops.object.mode_set(mode = 'OBJECT')
+                mesh = geo.to_mesh(scene, True, 'PREVIEW', calc_tessface=False)
+                mesh.transform(geo.matrix_world)
+                scene.objects.active = geo
+                csf = [face for face in mesh.polygons if mesh.materials[face.material_index].livi_sense]
+                csfi = [f.index for f in csf]
+                if node.cpoint == '0':  
+                    reslen += len(csfi)
+                    for f in csf:
+                        fc = f.center
+                        rtpoints += '{0[0]} {0[1]} {0[2]} {1[0]} {1[1]} {1[2]} \n'.format(fc, f.normal.normalized()[:])
+                elif node.cpoint == '1':        
+                    csfvi = [item for sublist in [face.vertices[:] for face in mesh.polygons if mesh.materials[face.material_index].livi_sense] for item in sublist]
+                    cverts = [v for (i,v) in enumerate(csfvi) if v not in csfvi[0:i]]
+                    reslen += len(cverts)
+                    for vert in cverts:
+                        rtpoints += '{0[0]} {0[1]} {0[2]} {1[0]} {1[1]} {1[2]} \n'.format(mesh.vertices[vert].co[:], (mesh.vertices[vert].normal*geo.matrix_world.inverted()).normalized()[:])
+
+                (geo['cverts'], geo['cfaces']) = (cverts, csfi) if node.cpoint == '1' else ([], csfi)                   
+                bpy.data.meshes.remove(mesh)
             else:
-                node.export = 0
-                export_op.report({'ERROR'},"Make sure your object "+geo.name+" has an associated material")
+                if geo.get('licalc'):
+                    del geo['licalc']
+                for mat in geo.material_slots:
+                    mat.material.use_transparent_shadows = True
+        else:
+            node.export = 0
+            export_op.report({'ERROR'},"Make sure your object "+geo.name+" has an associated material")
         node.reslen = reslen
+    
+    with open(node.filebase+".rtrace", "w") as rtrace:
+        rtrace.write(rtpoints)
+    
     scene.fe = max(scene.cfe, scene.gfe)
     node.export = 1
 
@@ -305,7 +306,7 @@ def radcexport(export_op, node):
 def sunexport(scene, node, geonode, locnode, frame): 
     if locnode:
         simtime = node.starttime + frame*datetime.timedelta(seconds = 3600*node.interval)
-        solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, locnode['latitude'], locnode['longitude'])
+        solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, scene['latitude'], scene['longitude'])
         subprocess.call("gensky -ang {} {} {} > {}".format(solalt, solazi, node.skytypeparams, retsky(frame, node, geonode)), shell = True)
     else:
         subprocess.call("gensky -ang {} {} {} > {}".format(45, 0, node.skytypeparams, retsky(0, node, geonode)), shell = True)
@@ -322,7 +323,7 @@ def hdrexport(scene, frame, node, geonode):
 
 def blsunexport(scene, node, locnode, frame, sun):
     simtime = node.starttime + frame*datetime.timedelta(seconds = 3600*node.interval)
-    solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, locnode['latitude'], locnode['longitude'])
+    solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, scene['latitude'], scene['longitude'])
     if node.skynum < 2:
         if frame == 0:
             sun.data.shadow_method = 'RAY_SHADOW'
@@ -336,7 +337,7 @@ def blsunexport(scene, node, locnode, frame, sun):
                 sun.data.energy = 3
         sun.location = [x*20 for x in (-sin(phi), -cos(phi), tan(beta))]
         sun.rotation_euler = (math.pi/2) - beta, 0, -phi
-        if scene.render.engine == 'CYCLES':# and bpy.data.worlds['World'].get('node_tree'):
+        if scene.render.engine == 'CYCLES' and bpy.data.worlds['World'].get('node_tree'):
             if 'Sky Texture' in [no.bl_label for no in bpy.data.worlds['World'].node_tree.nodes]:
                 bpy.data.worlds['World'].node_tree.nodes['Sky Texture'].sun_direction = -sin(phi), -cos(phi), sin(beta)#sin(phi), -cos(phi), -2* beta/math.pi
                 bpy.data.worlds['World'].node_tree.nodes['Sky Texture'].keyframe_insert(data_path = 'sun_direction', frame = frame)
@@ -386,51 +387,51 @@ def fexport(scene, frame, export_op, node, othernode, **kwargs):
     export_op.report({'INFO'},"Export is finished")
 
 def cyfc1(self):
-    if bpy.data.scenes[0].render.engine == "CYCLES":
-        scene = bpy.context.scene
-        if 'LiVi' in scene.resnode or 'Shadow' in scene.resnode:
-            for material in bpy.data.materials:
-                if material.use_nodes == 1:
-                    try:
-                        if material.livi_sense or material.vi_shadow and material.node_tree.nodes.get('Attribute'):
-                            material.node_tree.nodes["Attribute"].attribute_name = str(scene.frame_current)
-                    except Exception as e:
-                        print(e, 'Something wrong with changing the material attribute name')
 
-        if scene.resnode == 'VI Sun Path':
-            spoblist = {ob.get('VIType'):ob for ob in scene.objects if ob.get('VIType') in ('Sun', 'SPathMesh')}
-            beta, phi = solarPosition(scene.solday, scene.solhour, scene['latitude'], scene['longitude'])[2:]
-            if bpy.data.worlds.get('World'):
-                if bpy.data.worlds["World"].use_nodes == False:
-                    bpy.data.worlds["World"].use_nodes = True
-                nt = bpy.data.worlds[0].node_tree
-                if nt.nodes.get('Sky Texture'):
-                    bpy.data.worlds['World'].node_tree.nodes['Sky Texture'].sun_direction = -sin(phi), -cos(phi), sin(beta)
-            for ob in scene.objects:
-                if ob.get('VIType') == 'Sun':
-                    ob.rotation_euler = pi * 0.5 - beta, 0, -phi
-                    if ob.data.node_tree:
-                        for blnode in [blnode for blnode in ob.data.node_tree.nodes if blnode.bl_label == 'Blackbody']:
-                            blnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
-                        for emnode in [emnode for emnode in ob.data.node_tree.nodes if emnode.bl_label == 'Emission']:
-                            emnode.inputs[1].default_value = 5 * sin(beta)
-                
-                elif ob.get('VIType') == 'SPathMesh':
-                    ob.scale = 3 * [scene.soldistance/100]
-                
-                elif ob.get('VIType') == 'SkyMesh':
-                    ont = ob.data.materials['SkyMesh'].node_tree
-                    if ont.nodes.get('Sky Texture'):
-                        ont.nodes['Sky Texture'].sun_direction = sin(phi), -cos(phi), sin(beta)
-                
-                elif ob.get('VIType') == 'SunMesh':
-                    ob.scale = 3*[scene.soldistance/100]
-                    ob.location.z = spoblist['Sun'].location.z = spoblist['SPathMesh'].location.z + scene.soldistance * sin(beta)
-                    ob.location.x = spoblist['Sun'].location.x = spoblist['SPathMesh'].location.x -(scene.soldistance**2 - (spoblist['Sun'].location.z-spoblist['SPathMesh'].location.z)**2)**0.5  * sin(phi)
-                    ob.location.y = spoblist['Sun'].location.y = spoblist['SPathMesh'].location.y -(scene.soldistance**2 - (spoblist['Sun'].location.z-spoblist['SPathMesh'].location.z)**2)**0.5 * cos(phi)
-                    if ob.data.materials[0].node_tree:
-                        for smblnode in [smblnode for smblnode in ob.data.materials[0].node_tree.nodes if ob.data.materials and smblnode.bl_label == 'Blackbody']:
-                            smblnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
+    scene = bpy.context.scene
+    if 'LiVi' in scene.resnode or 'Shadow' in scene.resnode:
+        for material in bpy.data.materials:
+            if material.use_nodes == 1:
+                try:
+                    if material.livi_sense or material.vi_shadow and material.node_tree.nodes.get('Attribute'):
+                        material.node_tree.nodes["Attribute"].attribute_name = str(scene.frame_current)
+                except Exception as e:
+                    print(e, 'Something wrong with changing the material attribute name')
+
+    if scene.resnode == 'VI Sun Path':
+        spoblist = {ob.get('VIType'):ob for ob in scene.objects if ob.get('VIType') in ('Sun', 'SPathMesh')}
+        beta, phi = solarPosition(scene.solday, scene.solhour, scene['latitude'], scene['longitude'])[2:]
+        if bpy.data.worlds.get('World'):
+            if bpy.data.worlds["World"].use_nodes == False:
+                bpy.data.worlds["World"].use_nodes = True
+            nt = bpy.data.worlds[0].node_tree
+            if nt and nt.nodes.get('Sky Texture'):
+                bpy.data.worlds['World'].node_tree.nodes['Sky Texture'].sun_direction = -sin(phi), -cos(phi), sin(beta)
+        for ob in scene.objects:
+            if ob.get('VIType') == 'Sun':
+                ob.rotation_euler = pi * 0.5 - beta, 0, -phi
+                if ob.data.node_tree:
+                    for blnode in [blnode for blnode in ob.data.node_tree.nodes if blnode.bl_label == 'Blackbody']:
+                        blnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
+                    for emnode in [emnode for emnode in ob.data.node_tree.nodes if emnode.bl_label == 'Emission']:
+                        emnode.inputs[1].default_value = 5 * sin(beta)
+            
+            elif ob.get('VIType') == 'SPathMesh':
+                ob.scale = 3 * [scene.soldistance/100]
+            
+            elif ob.get('VIType') == 'SkyMesh':
+                ont = ob.data.materials['SkyMesh'].node_tree
+                if ont and ont.nodes.get('Sky Texture'):
+                    ont.nodes['Sky Texture'].sun_direction = sin(phi), -cos(phi), sin(beta)
+            
+            elif ob.get('VIType') == 'SunMesh':
+                ob.scale = 3*[scene.soldistance/100]
+                ob.location.z = spoblist['Sun'].location.z = spoblist['SPathMesh'].location.z + scene.soldistance * sin(beta)
+                ob.location.x = spoblist['Sun'].location.x = spoblist['SPathMesh'].location.x -(scene.soldistance**2 - (spoblist['Sun'].location.z-spoblist['SPathMesh'].location.z)**2)**0.5  * sin(phi)
+                ob.location.y = spoblist['Sun'].location.y = spoblist['SPathMesh'].location.y -(scene.soldistance**2 - (spoblist['Sun'].location.z-spoblist['SPathMesh'].location.z)**2)**0.5 * cos(phi)
+                if ob.data.materials[0].node_tree:
+                    for smblnode in [smblnode for smblnode in ob.data.materials[0].node_tree.nodes if ob.data.materials and smblnode.bl_label == 'Blackbody']:
+                        smblnode.inputs[0].default_value = 2000 + 3500*sin(beta)**0.5
                 
 #        bpy.data.worlds[0].use_nodes = 0
 #        ti.sleep(0.1)

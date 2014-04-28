@@ -195,6 +195,7 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
 
     def invoke(self, context, event):
         node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
+#        node.nodeexported(context)
         scene = context.scene        
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
         scene.frame_start = 0
@@ -501,10 +502,10 @@ class NODE_OT_SunPath(bpy.types.Operator):
     def invoke(self, context, event):
         solringnum, sd, numpos, ordinals = 0, 100, {}, []
         node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
-        locnode = node.inputs[0].links[0].from_node
+#        locnode = node.inputs[0].links[0].from_node
         scene, scene.resnode, scene.restree = context.scene, node.name, self.nodeid.split('@')[1]
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 1, 1, 0, 0, 0, 0, 0
-        scene['latitude'], scene['longitude'] = locnode.retlatlong(context)
+#        scene['latitude'], scene['longitude'] = locnode.updatelatlong(context)
 
         if 'SolEquoRings' not in [mat.name for mat in bpy.data.materials]:
             bpy.data.materials.new('SolEquoRings')

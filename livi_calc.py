@@ -32,9 +32,10 @@ def radfexport(scene, export_op, connode, geonode, frames):
     for frame in frames:
         livi_export.fexport(scene, frame, export_op, connode, geonode, pause = 1)
 
-def rad_prev(prev_op, simnode, connode, geonode, simacc):
+def rad_prev(prev_op, simnode, connode, geonode, simacc):    
     scene = bpy.context.scene    
     if os.path.isfile("{}-{}.rad".format(geonode.filebase, scene.frame_current)):
+#        connode.nodeexported(bpy.context)
         cam = scene.camera
         if cam != None:
             cang = '180 -vth' if connode.analysismenu == '3' else cam.data.angle*180/pi
@@ -62,6 +63,7 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
     if os.lstat(geonode.filebase+".rtrace").st_size == 0:
         calc_op.report({'ERROR'},"There are no materials with the livi sensor option enabled")
     else:
+#        connode.nodeexported(bpy.context)
         if np == 1:
             res, svres = numpy.zeros([len(frames), geonode.reslen]), numpy.zeros([len(frames), geonode.reslen])
         else:

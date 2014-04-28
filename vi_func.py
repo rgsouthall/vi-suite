@@ -628,7 +628,7 @@ def epwlatilongi(scene, node):
         latitude, longitude = float(fl.split(",")[6]), float(fl.split(",")[7])
 #    else:
 #        latitude, longitude = node.latitude, node.longitude
-    return(latitude, longitude)   
+    return latitude, longitude  
     
 #Compute solar position (altitude and azimuth in degrees) based on day of year (doy; integer), local solar time (lst; decimal hours), latitude (lat; decimal degrees), and longitude (lon; decimal degrees).
 def solarPosition(doy, lst, lat, lon):

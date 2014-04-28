@@ -525,16 +525,16 @@ class ViLoc(bpy.types.Node, ViNodes):
     bl_label = 'VI Location'
     bl_icon = 'LAMP'
             
-#    def updatelatlong(self, context):
-                 
+    def updatelatlong(self, context):
+        (context.scene['latitude'], context.scene['longitude']) = epwlatilongi(context.scene, self) if self.loc == '1' and self.weather else (self.lat, self.long)
 
     (filepath, filename, filedir, newdir, filebase, objfilebase, nodetree, nproc, rm , cp, cat, fold) = (bpy.props.StringProperty() for x in range(12))
     epwpath = os.path.dirname(inspect.getfile(inspect.currentframe()))+'/EPFiles/Weather/'
     weatherlist = [((wfile, os.path.basename(wfile).strip('.epw').split(".")[0], 'Weather Location')) for wfile in glob.glob(epwpath+"/*.epw")]
-    weather = bpy.props.EnumProperty(items = weatherlist, name="", description="Weather for this project")
-    loc = bpy.props.EnumProperty(items = [("0", "Manual", "Manual location"), ("1", "EPW ", "Get location from EPW file")], name = "", description = "Location", default = "0")
-    lat = bpy.props.FloatProperty(name="Latitude", description="Site Latitude", min=-90, max=90, default=52)
-    long = bpy.props.FloatProperty(name="Longitude", description="Site Longitude (East is positive, West is negative)", min=-180, max=180, default=0)
+    weather = bpy.props.EnumProperty(items = weatherlist, name="", description="Weather for this project", update = updatelatlong)
+    loc = bpy.props.EnumProperty(items = [("0", "Manual", "Manual location"), ("1", "EPW ", "Get location from EPW file")], name = "", description = "Location", default = "0", update = updatelatlong)
+    lat = bpy.props.FloatProperty(name="Latitude", description="Site Latitude", min=-90, max=90, default=52, update = updatelatlong)
+    long = bpy.props.FloatProperty(name="Longitude", description="Site Longitude (East is positive, West is negative)", min=-180, max=180, default=0, update = updatelatlong)
     maxws = bpy.props.FloatProperty(name="", description="Max wind speed", min=0, max=90, default=0)
     minws = bpy.props.FloatProperty(name="", description="Min wind speed", min=0, max=90, default=0)
     avws = bpy.props.FloatProperty(name="", description="Average wind speed", min=0, max=90, default=0)
@@ -546,12 +546,11 @@ class ViLoc(bpy.types.Node, ViNodes):
         self['nodeid'] = nodeid(self, bpy.data.node_groups)
         bpy.data.node_groups[self['nodeid'].split('@')[1]].use_fake_user = True
         self.outputs.new('ViLoc', 'Location out')
-#        self['latitude'] = 52
-#        self['longitude'] = 0
+        context.scene['latitude'] = self.lat
+        context.scene['longitude'] = self.long
         if bpy.data.filepath:
             nodeinit(self)
         
-
     def update(self):
         socklink(self.outputs[0], self['nodeid'].split('@')[1])
 
@@ -572,12 +571,7 @@ class ViLoc(bpy.types.Node, ViNodes):
             row.prop(self, "startmonth")
             row = layout.row()
             row.prop(self, "endmonth")
-    
-    def retlatlong(self, context):
-        if self.loc == '1' and self.weather:
-            return epwlatilongi(context.scene, self)
-        else:
-            return self.lat, self.long
+        
 
 class ViGExEnNode(bpy.types.Node, ViNodes):
     '''Node describing an EnVi Geometry Export'''
