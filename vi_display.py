@@ -383,26 +383,38 @@ def li_compliance(self, context, connode):
             vi_func.drawloop(100, height - 70, 900, height - 70  - (lencrit)*25)
             mat = [m for m in bpy.context.active_object.data.materials if m.livi_sense][0]
             if connode.analysismenu == '0':
-                buildspace = ('', '', (' - Public/Staff', ' - Patient')[int(mat.hspacemenu)], (' - Kitchen', ' - Living/Dining/Study', ' - Communal')[int(mat.rspacemenu)], (' - Sales', ' - Office')[int(mat.respacemenu)])[int(connode.bambuildmenu)]
+                buildspace = ('', '', (' - Public/Staff', ' - Patient')[int(mat.hspacemenu)], (' - Kitchen', ' - Living/Dining/Study', ' - Communal')[int(mat.rspacemenu)], (' - Sales', ' - Office')[int(mat.respacemenu)], '')[int(connode.bambuildmenu)]
             elif connode.analysismenu == '1':
                 buildspace = (' - Kitchen', ' - Living/Dining/Study')[int(mat.rspacemenu)]
 
             titles = ('Zone Metric', 'Target', 'Achieved', 'PASS/FAIL')
             tables = [[] for c in range(lencrit -1)]
             etables = [[] for e in range(len(geo['ecrit']))]
+
             for c, cr in enumerate(geo['crit']):
                 if cr[0] == 'Percent':
-                    tables[c] = ('{} (%)'.format(('Percentage area with Skyview', 'Average{}Daylight Factor'.format((' ', ' Point ')[cr[2] == 'PDF']))[cr[2] in ('DF', 'PDF')]), (cr[1],cr[3])[cr[2] in ('PDF','DF')], '{:.2f}'.format(geo['comps'][frame][:][c*2 + 1]), geo['cr4'][c].upper())
+                    if cr[2] == 'Skyview':
+                        tables[c] = ('Percentage area with Skyview (%)', cr[1], '{:.2f}'.format(geo['comps'][frame][:][c*2 + 1]), geo['cr4'][c].upper())
+                    elif cr[2] == 'DF':  
+                        tables[c] = ('Average Daylight Factor (%)', cr[3], '{:.2f}'.format(geo['comps'][frame][:][c*2 + 1]), geo['cr4'][c].upper())
+                    elif cr[2] == 'PDF':    
+                        tables[c] = ('Area with point Daylight Factor above {}'.format(cr[3]), cr[1], '{:.2f}'.format(geo['comps'][frame][:][c*2 + 1]), geo['cr4'][c].upper())
                 elif cr[0] == 'Ratio':
                     tables[c] = ('Uniformity ratio', cr[3], '{:.2f}'.format(geo['comps'][frame][:][c*2 + 1]), geo['cr4'][c].upper())
                 elif cr[0] == 'Min':
                     tables[c] = ('Minimum {} (%)'.format('Point Daylight Factor'), cr[3], '{:.2f}'.format(geo['comps'][frame][:][c*2 + 1]), geo['cr4'][c].upper())
                 elif cr[0] == 'Average':
                     tables[c] = ('Average {} (%)'.format('Daylight Factor'), cr[3], '{:.2f}'.format(geo['comps'][frame][:][c*2 + 1]), geo['cr4'][c].upper())
+
             if connode.analysismenu == '0':
                 for e, ecr in enumerate(ecrit):
                     if ecr[0] == 'Percent':
-                        etables[e] = ('{} (%)'.format('Average Daylight Factor'), ecr[3], '{:.2f}'.format(geo['ecomps'][frame][:][e*2 + 1]), geo['ecr4'][e].upper())
+                        if ecr[2] == 'skyview':
+                            etables[e] = ('Percentage area with Skyview (%)', ecr[1], '{:.2f}'.format(geo['ecomps'][frame][:][e*2 + 1]), geo['ecr4'][e].upper())
+                        elif ecr[2] == 'DF':  
+                            etables[e] = ('Average Daylight Factor (%)', ecr[3], '{:.2f}'.format(geo['ecomps'][frame][:][e*2 + 1]), geo['ecr4'][e].upper())
+                        elif ecr[2] == 'PDF':    
+                            etables[e] = ('Area with point Daylight Factor above {}'.format(ecr[3]), ecr[1], '{:.2f}'.format(geo['ecomps'][frame][:][e*2 + 1]), geo['ecr4'][e].upper())
                     elif ecr[0] == 'Min':
                         etables[e] = ('Minimum {} (%)'.format('Point Daylight Factor'), ecr[3], '{:.2f}'.format(geo['ecomps'][frame][:][e*2 + 1]), geo['ecr4'][e].upper())
 
@@ -430,6 +442,7 @@ def li_compliance(self, context, connode):
 
         tpf = 'FAIL' if 'FAIL' in pfs or 'FAIL*' in pfs else 'PASS'
         if connode.analysismenu == '0':
+            
             (tpf, lencrit) = ('EXEMPLARY', lencrit + len(geo['ecrit'])) if tpf == 'PASS' and ('FAIL' not in epfs and 'FAIL*' not in epfs) else (tpf, lencrit)
 
         return(tpf, lencrit, buildspace, etables)

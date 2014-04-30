@@ -200,11 +200,11 @@ def radcexport(export_op, node):
     geonode = node.inputs['Geometry in'].links[0].from_node
 
     if node.bl_label != 'LiVi CBDM':
-        if node.skynum < 4:
-            locnode = 0 if node.skynum == 3 else node.inputs['Location in'].links[0].from_node            
+        if node['skynum'] < 4:
+            locnode = 0 if node['skynum'] == 3 else node.inputs['Location in'].links[0].from_node            
             for frame in range(scene.fs, scene.cfe + 1):
                 sunexport(scene, node, geonode, locnode, frame - scene.fs)
-                if node.skynum < 2 and node.analysismenu != '2':
+                if node['skynum'] < 2 and node.analysismenu != '2':
                     if frame == scene.frame_start:
                         if 'Sun' in [ob for ob in scene.objects if ob.get('VIType')]:
                             sun = [ob for ob in scene.objects if ob.get('VIType')][0]
@@ -221,17 +221,17 @@ def radcexport(export_op, node):
                     hdrexport(scene, frame, node, geonode)
             node['skyfiles'] = skyfileslist
             
-        elif node.skynum == 4:
+        elif node['skynum'] == 4:
             if node.hdrname not in bpy.data.images:
                 bpy.data.images.load(node.hdrname)
             node['skyfiles'] = [hdrsky(node.hdrname)]
 
-        elif node.skynum == 5:
+        elif node['skynum'] == 5:
             subprocess.call("cp {} {}".format(node.radname, geonode.filebase+"-0.sky"), shell = True)
             with open(node.radname, 'r') as radfiler:
                 node['skyfiles'] =  [radfiler.read()]
 
-        elif node.skynum == 6:
+        elif node['skynum'] == 6:
             node['skyfiles'] = ['']
 
     elif node.bl_label == 'LiVi CBDM':
@@ -307,9 +307,9 @@ def sunexport(scene, node, geonode, locnode, frame):
     if locnode:
         simtime = node.starttime + frame*datetime.timedelta(seconds = 3600*node.interval)
         solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, scene['latitude'], scene['longitude'])
-        subprocess.call("gensky -ang {} {} {} > {}".format(solalt, solazi, node.skytypeparams, retsky(frame, node, geonode)), shell = True)
+        subprocess.call("gensky -ang {} {} {} > {}".format(solalt, solazi, node['skytypeparams'], retsky(frame, node, geonode)), shell = True)
     else:
-        subprocess.call("gensky -ang {} {} {} > {}".format(45, 0, node.skytypeparams, retsky(0, node, geonode)), shell = True)
+        subprocess.call("gensky -ang {} {} {} > {}".format(45, 0, node['skytypeparams'], retsky(0, node, geonode)), shell = True)
 
 def hdrexport(scene, frame, node, geonode):
 #    if locnode:
@@ -324,15 +324,15 @@ def hdrexport(scene, frame, node, geonode):
 def blsunexport(scene, node, locnode, frame, sun):
     simtime = node.starttime + frame*datetime.timedelta(seconds = 3600*node.interval)
     solalt, solazi, beta, phi = solarPosition(simtime.timetuple()[7], simtime.hour + (simtime.minute)*0.016666, scene['latitude'], scene['longitude'])
-    if node.skynum < 2:
+    if node['skynum'] < 2:
         if frame == 0:
             sun.data.shadow_method = 'RAY_SHADOW'
             sun.data.shadow_ray_samples = 8
             sun.data.sky.use_sky = 1
-            if node.skynum == 0:
+            if node['skynum'] == 0:
                 sun.data.shadow_soft_size = 0.1
                 sun.data.energy = 5
-            elif node.skynum == 1:
+            elif node['skynum'] == 1:
                 sun.data.shadow_soft_size = 3
                 sun.data.energy = 3
         sun.location = [x*20 for x in (-sin(phi), -cos(phi), tan(beta))]
@@ -349,7 +349,7 @@ def blsunexport(scene, node, locnode, frame, sun):
 
 def skyexport(node, rad_sky):
     rad_sky.write("\nskyfunc glow skyglow\n0\n0\n")
-    rad_sky.write("4 .8 .8 1 0\n\n") if node.skynum < 3 else rad_sky.write("4 1 1 1 0\n\n")
+    rad_sky.write("4 .8 .8 1 0\n\n") if node['skynum'] < 3 else rad_sky.write("4 1 1 1 0\n\n")
     rad_sky.write("skyglow source sky\n0\n0\n4 0 0 1  180\n\n")
 
 def hdrsky(skyfile):
@@ -387,7 +387,6 @@ def fexport(scene, frame, export_op, node, othernode, **kwargs):
     export_op.report({'INFO'},"Export is finished")
 
 def cyfc1(self):
-
     scene = bpy.context.scene
     if 'LiVi' in scene.resnode or 'Shadow' in scene.resnode:
         for material in bpy.data.materials:

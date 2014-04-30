@@ -33,7 +33,7 @@ def radmat(mat, scene):
             except:
                 radname, radnums = 'plastic', '5 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1} {2:.2f}'.format((0.8, 0.8, 0.8), 0, 0)
 
-    else:# scene.render.engine == 'BLENDER_RENDER':
+    elif scene.render.engine == 'BLENDER_RENDER':
         matcol = [i * mat.diffuse_intensity for i in mat.diffuse_color]
         matior = mat.raytrace_transparency.ior
         matrough = 1.0-mat.specular_hardness/511.0
@@ -60,7 +60,9 @@ def radmat(mat, scene):
             radname, radnums  = 'metal', '5 {0[0]:.3f} {0[1]:.3f} {0[2]:.3f} {1} {2}'.format(matcol, mat.specular_intensity, 1.0-mat.specular_hardness/511.0)
         else:
             radname, radnums  = 'plastic', '5 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1:.2f} {2:.2f}'.format(matcol, mat.specular_intensity, 1.0-mat.specular_hardness/511.0)
-
+    else:
+        radname, radnums = 'plastic', '5 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1} {2:.2f}'.format((0.8, 0.8, 0.8), 0, 0)
+    
     return(radname, matname, radnums)
 
 def face_centre(ob, obresnum, f):

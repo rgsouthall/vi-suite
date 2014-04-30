@@ -42,10 +42,12 @@ class NODE_OT_LiGExport(bpy.types.Operator):
     def invoke(self, context, event):
         scene = context.scene
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
+
         if bpy.data.filepath and " " not in bpy.data.filepath:
             if bpy.context.active_object and bpy.context.active_object.type == 'MESH' and not bpy.context.active_object.hide:
                 bpy.ops.object.mode_set()
             node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
+            node.export(context)
 #            node['radfiles'] = []
             node['frames'] = {'Material': 0, 'Geometry': 0, 'Lights':0} 
             for mglfr in node['frames']:
@@ -195,15 +197,15 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
 
     def invoke(self, context, event):
         node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
-#        node.nodeexported(context)
+        node.export(context)
         scene = context.scene        
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
         scene.frame_start = 0
         scene.frame_set(0)
                 
         if 'LiVi Basic' in node.bl_label:
-            node.starttime = datetime.datetime(datetime.datetime.now().year, 1, 1, int(node.shour), int((node.shour - int(node.shour))*60)) + datetime.timedelta(node.sdoy - 1) if node.skynum < 3 else datetime.datetime(datetime.datetime.now().year, 1, 1, 12)
-            if node.animmenu == 'Time' and node.skynum < 3:
+            node.starttime = datetime.datetime(datetime.datetime.now().year, 1, 1, int(node.shour), int((node.shour - int(node.shour))*60)) + datetime.timedelta(node.sdoy - 1) if node['skynum'] < 3 else datetime.datetime(datetime.datetime.now().year, 1, 1, 12)
+            if node.animmenu == 'Time' and node['skynum'] < 3:
                 node.endtime = datetime.datetime(2013, 1, 1, int(node.ehour), int((node.ehour - int(node.ehour))*60)) + datetime.timedelta(node.edoy - 1)
         if bpy.data.filepath:
             if bpy.context.object:
