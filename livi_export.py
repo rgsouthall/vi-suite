@@ -186,7 +186,7 @@ def radgexport(export_op, node, **kwargs):
         else:
             node.export = 0
             export_op.report({'ERROR'},"Make sure your object "+geo.name+" has an associated material")
-        node.reslen = reslen
+        node['reslen'] = reslen
     
     with open(node.filebase+".rtrace", "w") as rtrace:
         rtrace.write(rtpoints)

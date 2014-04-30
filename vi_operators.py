@@ -49,13 +49,7 @@ class NODE_OT_LiGExport(bpy.types.Operator):
             node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
             node.export(context)
 #            node['radfiles'] = []
-            node['frames'] = {'Material': 0, 'Geometry': 0, 'Lights':0} 
-            for mglfr in node['frames']:
-                node['frames'][mglfr] = scene.frame_end if node.animmenu == mglfr else 0
-                scene.gfe = max(node['frames'].values())
-            if node.filepath != bpy.data.filepath:
-                nodeinit(node)
-            node.reslen = 0
+            
             scene.frame_start, bpy.data.node_groups[self.nodeid.split('@')[1]].use_fake_user = 0, 1
             scene.frame_set(0)
             radgexport(self, node)
@@ -213,13 +207,13 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
                     bpy.ops.object.mode_set(mode = 'OBJECT')
 
             if " " not in bpy.data.filepath:
-                if (node.bl_label == 'LiVi CBDM' and node.inputs['Geometry in'].is_linked and (node.inputs['Location in'].is_linked or node.sm != '0')) \
-                or (node.bl_label != 'LiVi CBDM' and node.inputs['Geometry in'].is_linked):
-                    node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
+                if ('LiVi CBDM' in node.bl_label and node.inputs['Geometry in'].is_linked and (node.inputs['Location in'].is_linked or node.sm != '0')) \
+                or ('LiVi CBDM' not in node.bl_label and node.inputs['Geometry in'].is_linked):                    
                     scene.li_compliance = 1 if node.bl_label == 'LiVi Compliance' else 0
                     radcexport(self, node)
                     node.exported = True
                     node.outputs['Context out'].hide = False
+                    node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
                 else:
                     self.report({'ERROR'},"Required input nodes are not linked")
                     node.outputs['Context out'].hide = True
@@ -270,10 +264,8 @@ class NODE_OT_LiViCalc(bpy.types.Operator):
             geo.licalc = any([m.livi_sense for m in geo.data.materials])
         geogennode = geonode.outputs['Generative out'].links[0].to_node if geonode.outputs['Generative out'].is_linked else 0  
         
-        if connode.bl_label == 'LiVi Basic':   
-               
+        if connode.bl_label == 'LiVi Basic':                  
             tarnode = connode.outputs['Target out'].links[0].to_node if connode.outputs['Target out'].is_linked else 0
-
             if geogennode and tarnode: 
                 simnode['Animation'] = 'Animated'
                 vigen(self, li_calc, resapply, geonode, connode, simnode, geogennode, tarnode)     
@@ -689,7 +681,8 @@ class VIEW3D_OT_SPNumDisplay(bpy.types.Operator):
     bl_undo = True
 
     def modal(self, context, event):
-        context.area.tag_redraw()
+        if context.area:
+            context.area.tag_redraw()
         if context.scene.vi_display == 0 or not context.scene.sp_disp_panel:
             bpy.types.SpaceView3D.draw_handler_remove(self._handle_spnum, 'WINDOW')
             return {'CANCELLED'}
@@ -863,7 +856,7 @@ class NODE_OT_Shadow(bpy.types.Operator):
         interval = datetime.timedelta(hours = modf(simnode.interval)[0], minutes = 60 * modf(simnode.interval)[1])
         while time <= endtime:
             if simnode.starthour <= time.hour <= simnode.endhour:
-                beta, phi = solarPosition(time.timetuple().tm_yday, time.hour+time.minute/60, locnode['latitude'], locnode['longitude'])[2:]
+                beta, phi = solarPosition(time.timetuple().tm_yday, time.hour+time.minute/60, scene['latitude'], scene['longitude'])[2:]
                 if beta > 0:
                     direcs.append(mathutils.Vector((-sin(phi), -cos(phi), tan(beta))))
             time += interval

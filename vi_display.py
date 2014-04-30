@@ -156,7 +156,7 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
     if bpy.context.active_object:
         if bpy.context.active_object.type == 'MESH' and bpy.context.active_object.mode != 'OBJECT':
              bpy.context.active_object.mode = 'OBJECT'
-
+    
     blf.enable(0, 4)
     blf.shadow(0, 5, scene.vi_display_rp_fsh[0], scene.vi_display_rp_fsh[1], scene.vi_display_rp_fsh[2], scene.vi_display_rp_fsh[3])
     bgl.glColor4f(*scene.vi_display_rp_fc[:])
@@ -178,7 +178,8 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
         obm = ob.data
         ob_mat = ob.matrix_world
         view_mat = context.space_data.region_3d.perspective_matrix
-        view_pos = [vmi*scene['cs']*2 for vmi in (view_mat.inverted()[0][3], view_mat.inverted()[1][3], view_mat.inverted()[2][3])]
+        view_pos = [vmi*scene['cs'] * 2 for vmi in (view_mat.inverted()[0][3], view_mat.inverted()[1][3], view_mat.inverted()[2][3])]
+
         if cp == "0" or not geonode:
             faces = [f for f in ob.data.polygons if f.select == True] if ob.lires else [f for f in ob.data.polygons if ob.data.materials[f.material_index].vi_shadow] if simnode.bl_label == 'VI Shadow Study' else [f for f in ob.data.polygons if f.select == True] if ob.lires else [f for f in ob.data.polygons if ob.data.materials[f.material_index].livi_sense]
             if scene.vi_display_vis_only:

@@ -35,7 +35,6 @@ def radfexport(scene, export_op, connode, geonode, frames):
 def rad_prev(prev_op, simnode, connode, geonode, simacc):    
     scene = bpy.context.scene    
     if os.path.isfile("{}-{}.rad".format(geonode.filebase, scene.frame_current)):
-#        connode.nodeexported(bpy.context)
         cam = scene.camera
         if cam != None:
             cang = '180 -vth' if connode.analysismenu == '3' else cam.data.angle*180/pi
@@ -44,9 +43,6 @@ def rad_prev(prev_op, simnode, connode, geonode, simacc):
             rvurun = Popen(rvucmd, shell = True, stdout=PIPE, stderr=STDOUT)
             for l,line in enumerate(rvurun.stdout):            
                 if 'octree' in line.decode() or 'mesh' in line.decode():
-#                    print(line.decode() + ' rerunning export')
-#                    radfexport(scene, prev_op, connode, geonode, [scene.frame_current])
-#                    rad_prev(prev_op, simnode, connode, geonode, simacc)
                     prev_op.report({'ERROR'}, "Something wrong with the Radiance input files. Try rerunning the geometry and context export")
                     return
         else:
@@ -64,9 +60,9 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
         calc_op.report({'ERROR'},"There are no materials with the livi sensor option enabled")
     else:
         if np == 1:
-            res, svres = numpy.zeros([len(frames), geonode.reslen]), numpy.zeros([len(frames), geonode.reslen])
+            res, svres = numpy.zeros([len(frames), geonode['reslen']]), numpy.zeros([len(frames), geonode['reslen']])
         else:
-            res, svres = [[[0 for p in range(geonode.reslen)] for x in range(len(frames))] for x in range(2)]
+            res, svres = [[[0 for p in range(geonode['reslen'])] for x in range(len(frames))] for x in range(2)]
 
         for frame in frames:            
             findex = frame - scene.fs if not kwargs.get('genframe') else 0
@@ -103,7 +99,7 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
                 if connode.sourcemenu == '1':
                     connode['vecvals'], vals = vi_func.mtx2vals(open(connode.mtxname, "r").readlines(), datetime.datetime(2010, 1, 1).weekday(), '')
                 hours = 0
-                sensarray = [[0 for x in range(146)] for y in range(geonode.reslen)] if np == 0 else numpy.zeros([geonode.reslen, 146])
+                sensarray = [[0 for x in range(146)] for y in range(geonode['reslen'])] if np == 0 else numpy.zeros([geonode['reslen'], 146])
                 oconvcmd = "oconv -w - > {0}-ws.oct".format(geonode.filebase)
                 Popen(oconvcmd, shell = True, stdin = PIPE, stdout=PIPE, stderr=STDOUT).communicate(input = (connode['whitesky']+geonode['radfiles'][frame]).encode('utf-8'))
                 senscmd = geonode.cat+geonode.filebase+".rtrace | rcontrib -w  -h -I -fo -bn 146 "+simnode['radparams']+" -n "+geonode.nproc+" -f tregenza.cal -b tbin -m sky_glow "+geonode.filebase+"-ws.oct"
@@ -119,7 +115,7 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
 
                 for l, readings in enumerate(connode['vecvals']):
                     if connode.analysismenu == '3' or (connode.cbdm_start_hour <= readings[:][0] < connode.cbdm_end_hour and readings[:][1] < connode['wd']):
-                        finalillu = [0 for x in range(geonode.reslen)] if np == 0 else numpy.zeros((geonode.reslen))
+                        finalillu = [0 for x in range(geonode['reslen'])] if np == 0 else numpy.zeros((geonode['reslen']))
                         for f, fi in enumerate(finalillu):
                             finalillu[f] = numpy.sum([numpy.multiply(sensarray[f], readings[2:])]) if np == 1 else sum([a*b for a,b in zip(sensarray[f],readings[2:])])
                         hours += 1
@@ -134,7 +130,7 @@ def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs):
                         elif connode.analysismenu == '3':
                             if np ==1:
                                 if hours == 1:
-                                    reswatt = numpy.zeros((len(frames), len(connode['vecvals']), geonode.reslen)) 
+                                    reswatt = numpy.zeros((len(frames), len(connode['vecvals']), geonode['reslen'])) 
                                 reswatt[findex][l] = finalillu
                                 for i in range(len(finalillu)):
                                     numpy.append(res[findex][i], finalillu[i])                                

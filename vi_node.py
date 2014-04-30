@@ -45,7 +45,6 @@ class ViGExLiNode(bpy.types.Node, ViNodes):
     bl_icon = 'LAMP'
 
     (filepath, filename, filedir, newdir, filebase, objfilebase, nodetree, nproc, rm, cp, cat, fold) = (bpy.props.StringProperty() for x in range(12))
-    reslen = bpy.props.IntProperty(default = 0)
     exported = bpy.props.BoolProperty()
 
     def nodeupdate(self, context):
@@ -83,6 +82,14 @@ class ViGExLiNode(bpy.types.Node, ViNodes):
         if self.get('nodeid'):
             socklink(self.outputs['Generative out'], self['nodeid'].split('@')[1])
             socklink(self.outputs['Geometry out'], self['nodeid'].split('@')[1])
+            
+    def export(self, context):
+        self['frames'] = {'Material': 0, 'Geometry': 0, 'Lights':0} 
+        for mglfr in self['frames']:
+            self['frames'][mglfr] = context.scene.frame_end if self.animmenu == mglfr else 0
+            context.scene.gfe = max(self['frames'].values())
+        if self.filepath != bpy.data.filepath:
+            nodeinit(self)
         
 class ViLiNode(bpy.types.Node, ViNodes):
     '''Node describing a basic LiVi analysis'''
@@ -103,7 +110,6 @@ class ViLiNode(bpy.types.Node, ViNodes):
 #    skytypeparams = bpy.props.StringProperty(default = "+s")
         
     def nodeupdate(self, context):
-        scene = context.scene
         self.exported = False
         self.outputs['Context out'].hide = True
         self.bl_label = '*LiVi Basic'
@@ -154,8 +160,6 @@ class ViLiNode(bpy.types.Node, ViNodes):
         self['frames'] = {'Time':0}
         self['resname'] = 'illumout'
         self['unit'] = "Lux"
-
-
 
     def draw_buttons(self, context, layout):
         row = layout.row()
@@ -239,10 +243,8 @@ class ViLiCBNode(ViLiClass, ViNodes):
         self.exported = False
         if self.sm != '0' and self.inputs['Location in'].is_linked:
             bpy.data.node_groups[self['nodeid'].split('@')[1]].links.remove(self.inputs['Location in'].links[0])
-
         self.inputs['Location in'].hide = False if self.sm == '0' else True
-        
-    
+            
     analysistype = [('0', "Light Exposure", "LuxHours Calculation"), ('1', "Radiation Exposure", "kWh/m"+ u'\u00b2' + " Calculation"), ('2', "Daylight Autonomy", "DA (%) Calculation"), ('3', "Hourly irradiance", "Irradiance for each simulation time step"), ('4', "UDI", "Useful Daylight Illuminance")]
     analysismenu = bpy.props.EnumProperty(name="", description="Type of lighting analysis", items = analysistype, default = '0', update = nodeupdate)
     animtype = [('0', "Static", "Simple static analysis"), ('1', "Geometry", "Animated time analysis"), ('2', "Material", "Animated time analysis")]
@@ -278,11 +280,8 @@ class ViLiCBNode(ViLiClass, ViNodes):
         self.outputs.new('ViLiC', 'Context out')
         self.outputs['Context out'].hide = True
         self['nodeid'] = nodeid(self, bpy.data.node_groups)  
-        self['skynum']
         self['frames'] = {'Time':0}
-        self['resname'] = 'kluxhours'
         self['whitesky'] = "void glow sky_glow \n0 \n0 \n4 1 1 1 0 \nsky_glow source sky \n0 \n0 \n4 0 0 1 180 \nvoid glow ground_glow \n0 \n0 \n4 1 1 1 0 \nground_glow source ground \n0 \n0 \n4 0 0 -1 180\n\n"
-        self['unit'] = 'kLuxHours'
         
     def draw_buttons(self, context, layout):
         row = layout.row()
@@ -325,7 +324,7 @@ class ViLiCBNode(ViLiClass, ViNodes):
                     row = layout.row()
                     row.prop(self, 'vecname')
         
-        if self.sm == '0' and int(self.analysismenu) > 1:
+        if int(self.analysismenu) > 1:
             row = layout.row()
             row.label('Export HDR:')
             row.prop(self, 'hdr')
@@ -353,7 +352,6 @@ class ViLiCBNode(ViLiClass, ViNodes):
         self['wd'] = (7, 5)[self.weekdays]
         self['resname'] = ('kluxhours', 'cumwatth', 'dayauto', 'hourrad', 'udi')[int(self.analysismenu)]
         self['unit'] = ('kLuxHours', 'kWh', 'DA (%)', '', 'UDI-a (%)')[int(self.analysismenu)]
-#        self['num'] = (("-ab", 2, 3, 5), ("-ad", 512, 2048, 4096), ("-ar", 128, 512, 1024), ("-as", 256, 1024, 2048), ("-aa", 0.0, 0.0, 0.0), ("-dj", 0, 0.7, 1), ("-ds", 0, 0.5, 0.15), ("-dr", 1, 2, 3), ("-ss", 0, 2, 5), ("-st", 1, 0.75, 0.1), ("-lw", 0.05, 0.001, 0.0002))
 
 class ViLiCNode(bpy.types.Node, ViNodes):
     '''Node describing a VI-Suite lighting compliance node'''
@@ -368,9 +366,8 @@ class ViLiCNode(bpy.types.Node, ViNodes):
     interval = 0
     exported = bpy.props.BoolProperty(default=False)
     TZ = bpy.props.StringProperty(default = 'GMT')
-#    skynum = bpy.props.IntProperty(default = 3)
-    simalg = bpy.props.StringProperty(name="", description="Calculation algorithm", default=" |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)/100' " if str(sys.platform) != 'win32' else ' |  rcalc  -e "$1=(47.4*$1+120*$2+11.6*$3)/100" ')
-    resname = bpy.props.StringProperty()
+#    simalg = bpy.props.StringProperty(name="", description="Calculation algorithm", default=" |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)/100' " if str(sys.platform) != 'win32' else ' |  rcalc  -e "$1=(47.4*$1+120*$2+11.6*$3)/100" ')
+#    resname = bpy.props.StringProperty()
     unit = bpy.props.StringProperty()
     hdr = bpy.props.BoolProperty(name="HDR", description="Export HDR panoramas", default=False, update = nodeupdate)
     analysistype = [('0', "BREEAM", "BREEAM HEA1 calculation"), ('1', "CfSH", "Code for Sustainable Homes calculation")] #, ('2', "LEED", "LEED EQ8.1 calculation"), ('3', "Green Star", "Green Star Calculation")]
@@ -403,7 +400,7 @@ class ViLiCNode(bpy.types.Node, ViNodes):
             
     def export(self, context):
         if self.analysismenu in ('0', '1'):
-            self.simalg = " |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)/100' " if str(sys.platform) != 'win32' else ' |  rcalc  -e "$1=(47.4*$1+120*$2+11.6*$3)/100" '
+            self['simalg'] = " |  rcalc  -e '$1=(47.4*$1+120*$2+11.6*$3)/100' " if str(sys.platform) != 'win32' else ' |  rcalc  -e "$1=(47.4*$1+120*$2+11.6*$3)/100" '
         self['resname'] = 'breaamout' if self.analysismenu == '0' else 'cfsh'
         self['skytypeparams'] = "-b 22.86 -c"
         context.scene.cfe = 0
