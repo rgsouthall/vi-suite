@@ -147,7 +147,7 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
         return
     
     if not context.space_data.region_3d.is_perspective:
-        disp_op.report({'ERROR'},"Switch to prespective vie wmode for number display")
+        disp_op.report({'ERROR'},"Switch to prespective view mode for number display")
         return
     if scene.frame_current not in range(scene.fs, scene.fe + 1) and scene.vi_display:
         disp_op.report({'ERROR'},"Outside result frame range")

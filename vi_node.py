@@ -170,7 +170,7 @@ class ViLiNode(bpy.types.Node, ViNodes):
             row.label("Sky type:")
             row.prop(self, 'skymenu')
             if self.skymenu in ('0', '1', '2'):                
-                newrow(layout, "", self, 'animmenu')
+                newrow(layout, "Animation", self, 'animmenu')
                 newrow(layout, "Start hour:", self, 'shour')
                 newrow(layout, "Start day:", self, 'sdoy')
                 if self.animmenu == 'Time':

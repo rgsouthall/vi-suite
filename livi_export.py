@@ -199,7 +199,7 @@ def radcexport(export_op, node):
     clearscene(scene, export_op)
     geonode = node.inputs['Geometry in'].links[0].from_node
 
-    if node.bl_label != 'LiVi CBDM':
+    if 'LiVi CBDM' not in node.bl_label:
         if node['skynum'] < 4:
             locnode = 0 if node['skynum'] == 3 else node.inputs['Location in'].links[0].from_node            
             for frame in range(scene.fs, scene.cfe + 1):
