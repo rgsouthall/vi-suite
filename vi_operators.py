@@ -864,7 +864,7 @@ class NODE_OT_Shadow(bpy.types.Operator):
         for ob in [ob for ob in scene.objects if ob.type == 'MESH' and not ob.hide]:
             obavres, shadfaces, shadcentres = [0] * (fdiff), [[] for f in range(fdiff)], [[] for f in range(fdiff)]
             [obsumarea, obmaxres, obminres] = [[0 for f in range(fdiff)] for x in range(3)]
-            if len([mat for mat in ob.data.materials if mat.vi_shadow]) > 0:
+            if len([mat for mat in ob.data.materials if mat and mat.get('vi_shadow')]) > 0:
                 obcalclist.append(ob)
                 scene.objects.active, ob.licalc = ob, 1
                 obm = ob.matrix_world
