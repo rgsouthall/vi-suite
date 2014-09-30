@@ -845,13 +845,13 @@ class ViEnInNode(bpy.types.Node, ViNodes):
     newdir = bpy.props.StringProperty()
 
     def init(self, context):
+        self['nodeid'] = nodeid(self)
         self.outputs.new('ViEnC', 'Context out')
         self.outputs['Context out'].hide = True
-        self['nodeid'] = nodeid(self, bpy.data.node_groups)
 
     def draw_buttons(self, context, layout):
         row = layout.row()
-        row.label('ESO file:')
+        row.label('IDF file:')
         row.operator('node.idfselect', text = 'Select IDF file').nodeid = self['nodeid']
         row = layout.row()
         row.prop(self, 'idffilename')
@@ -1395,7 +1395,7 @@ vigennodecat = [NodeItem("ViGenNode", label="VI-Suite Generative"), NodeItem("Vi
 vidisnodecat = [NodeItem("ViChNode", label="VI-Suite Chart"), NodeItem("ViCSV", label="VI-Suite CSV")]
 viinnodecat = [NodeItem("ViEnInNode", label="EnergyPlus input file"), NodeItem("ViEnRFNode", label="EnergyPlus result file"), NodeItem("ViASCImport", label="Import ESRI Grid file")]
 
-vinode_categories = [ViNodeCategory("Input", "Input Nodes", items=viinnodecat), ViNodeCategory("Display", "Display Nodes", items=vidisnodecat), ViNodeCategory("Generative", "Generative Nodes", items=vigennodecat), ViNodeCategory("Analysis", "Analysis Nodes", items=vinodecat), ViNodeCategory("Export", "Export Nodes", items=viexnodecat)]
+vinode_categories = [ViNodeCategory("Import", "Import Nodes", items=viinnodecat), ViNodeCategory("Display", "Display Nodes", items=vidisnodecat), ViNodeCategory("Generative", "Generative Nodes", items=vigennodecat), ViNodeCategory("Analysis", "Analysis Nodes", items=vinodecat), ViNodeCategory("Export", "Export Nodes", items=viexnodecat)]
 
 
 ####################### EnVi ventilation network ##############################
@@ -2263,7 +2263,7 @@ class ViASCImport(bpy.types.Node, ViNodes):
     ascfile = bpy.props.StringProperty()
     
     def init(self, context):
-        self['nodeid'] = nodeid(self, bpy.data.node_groups)
+        self['nodeid'] = nodeid(self)
     
     def draw_buttons(self, context, layout):
         row = layout.row()

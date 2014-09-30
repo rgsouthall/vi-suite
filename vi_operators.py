@@ -539,7 +539,7 @@ class NODE_OT_ASCImport(bpy.types.Operator, io_utils.ImportHelper):
                 [ostartx, ostarty] = xy
                 [mstartx, mstarty] = [0, 0] if node.splitmesh else xy
                 [cols, rows, size, nodat] = [eval(lines[i].split()[1]) for i in (0, 1, 4, 5)]
-                vpos += [(mstartx + (size * ci), mstarty + (size * (rows - ri)), (float(h), 0)[h == nodat]) for ri, height in enumerate([line.split() for line in lines[6:]]) for ci, h in enumerate(height)] 
+                vpos += [(mstartx + (size * ci), mstarty + (size * (rows - ri)), (eval(h), 0)[eval(h) == nodat]) for ri, height in enumerate([line.split() for line in lines[6:]]) for ci, h in enumerate(height)] 
                 faces += [(i, i+1, i+rows + 1, i+rows) for i in range((vlen, 0)[node.splitmesh], len(vpos)-cols) if (i+1)%cols]
                 vlen += cols*rows
         
@@ -548,10 +548,10 @@ class NODE_OT_ASCImport(bpy.types.Operator, io_utils.ImportHelper):
                     me = bpy.data.meshes.new("{} mesh".format(basename)) 
                     me.from_pydata(vpos,[],faces)
                     me.update(calc_edges=True)
-                    dir(me)
                     ob = bpy.data.objects.new(basename, me)
                     ob.location = (ostartx - minstartx, ostarty - minstarty, 0) if node.splitmesh else (0, 0, 0)   # position object at 3d-cursor
                     bpy.context.scene.objects.link(ob) 
+        vlen, faces = [], []
         return {'FINISHED'}
 
     def invoke(self,context,event):
