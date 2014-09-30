@@ -287,7 +287,6 @@ def processf(pro_op, node):
     
             elif len(linesplit) > 3 and linesplit[2] == 'Day of Simulation[]':
                 resdict[linesplit[0]], resdict['Month'],  resdict['Day'], resdict['Hour'], dos, node['rtypes'] = ['Day of Simulation'], [], [], [], linesplit[0], ['Time']
-                print(dos)
     
             elif len(linesplit) > 3 and linesplit[2] == 'Environment':
                 if 'Climate' not in node['rtypes']:
