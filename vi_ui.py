@@ -33,9 +33,6 @@ class Vi3DPanel(bpy.types.Panel):
                 row.prop(scene, "vi_disp_3d")
                 row = layout.row()
                 row.operator("view3d.lidisplay", text="Shadow Display") if scene.resnode == 'VI Shadow Study' else row.operator("view3d.lidisplay", text="Radiance Display")
-#                    
-#                else:
-#                    row.operator("view3d.lidisplay", text="Radiance Display")
 
                 if scene.ss_disp_panel == 2 or scene.li_disp_panel == 2:
                     row = layout.row()
@@ -52,15 +49,10 @@ class Vi3DPanel(bpy.types.Panel):
                     if context.mode != "EDIT":
                         row = layout.row()
                         row.label(text="{:-<48}".format("Point visualisation "))
-                        propdict = OrderedDict([('Enable', "vi_display_rp"), ("Selected only:", "vi_display_sel_only"), ("Visible only:", "vi_display_vis_only"), ("Font size:", "vi_display_rp_fs"), ("Font colour:", "vi_display_rp_fc"), ("Font shadow:", "vi_display_rp_fsh")])
+                        propdict = OrderedDict([('Enable', "vi_display_rp"), ("Selected only:", "vi_display_sel_only"), ("Visible only:", "vi_display_vis_only"), ("Font size:", "vi_display_rp_fs"), ("Font colour:", "vi_display_rp_fc"), ("Font shadow:", "vi_display_rp_fsh"), ("Position offset:", "vi_display_rp_off")])
                         for prop in propdict.items():
                             newrow(layout, prop[0], scene, prop[1])
-#                        newrow(layout, "Enable:", scene, "vi_display_rp")
-#                        newrow(layout, "Selected only:", scene, "vi_display_sel_only")
-#                        newrow(layout, "Visible only:", scene, "vi_display_vis_only")
-#                        newrow(layout, "Font size:", scene, "vi_display_rp_fs")
-#                        newrow(layout, "Font colour:", scene, "vi_display_rp_fc")
-#                        newrow(layout, "Font shadow:", scene, "vi_display_rp_fsh")
+
                         row = layout.row()
                         row.label(text="{:-<60}".format(""))
 
@@ -68,11 +60,7 @@ class Vi3DPanel(bpy.types.Panel):
                         propdict = OrderedDict([("Compliance Panel", "li_compliance"), ("Asessment organisation:", "li_assorg"), ("Assesment individiual:", "li_assind"), ("Job number:", "li_jobno"), ("Project name:", "li_projname")])
                         for prop in propdict.items():
                             newrow(layout, prop[0], scene, prop[1])
-#                        newrow(layout, "Compliance Panel", scene, "li_compliance")
-#                        newrow(layout, "Asessment organisation:", scene, "li_assorg")
-#                        newrow(layout, "Assesment individiual:", scene, "li_assind")
-#                        newrow(layout, "Job number:", scene, "li_jobno")
-#                        newrow(layout, "Project name:", scene, "li_projname")
+
             newrow(layout, 'Display active', scene, 'vi_display')
 
 class VIMatPanel(bpy.types.Panel):
@@ -94,39 +82,31 @@ class VIMatPanel(bpy.types.Panel):
         row.prop(cm, "livi_sense")
         row = layout.row()
 
-        if bpy.data.node_groups.get(context.scene.restree):
-            ng = bpy.data.node_groups[context.scene.restree]
-            if ng.nodes.get(context.scene.resnode):
-                node = ng.nodes[context.scene.resnode]
-                if 'LiVi' in node.bl_label:
-                    if node.inputs['Context in'].is_linked:
-                        connode = node.inputs['Context in'].links[0].from_node
-                        if 'LiVi Compliance' in connode.bl_label:
-                            if cm.livi_sense:
-                                if connode.analysismenu == '0':
-                                    if connode.bambuildmenu == '2':
-                                        newrow(layout, "Space type:", cm, 'hspacemenu')
-                                    elif connode.bambuildmenu == '3':
-                                        newrow(layout, "Space type:", cm, 'rspacemenu')
-                                        if cm.rspacemenu == '2':
-                                            row = layout.row()
-                                            row.prop(cm, 'gl_roof')
-                                    elif connode.bambuildmenu == '4':
-                                        newrow(layout, "Space type:", cm, 'respacemenu')
-                                elif connode.analysismenu == '1':
-                                    newrow(layout, "Space type:", cm, 'rspacemenu')
-                                    if cm.rspacemenu == '2':
-                                        row = layout.row()
-                                        row.label('Warning: Not an assessable CfSH space')
+        if context.scene.get('liviparams'):
+            connode = bpy.data.node_groups[context.scene['liviparams']['compnode'].split('@')[1]].nodes[context.scene['liviparams']['compnode'].split('@')[0]]
+            if cm.livi_sense:
+                if connode.analysismenu == '0':
+                    if connode.bambuildmenu == '2':
+                        newrow(layout, "Space type:", cm, 'hspacemenu')
+                    elif connode.bambuildmenu == '3':
+                        newrow(layout, "Space type:", cm, 'brspacemenu')
+                        if cm.rspacemenu == '2':
+                            row = layout.row()
+                            row.prop(cm, 'gl_roof')
+                    elif connode.bambuildmenu == '4':
+                        newrow(layout, "Space type:", cm, 'respacemenu')
+                elif connode.analysismenu == '1':
+                    newrow(layout, "Space type:", cm, 'crspacemenu')
 
         row = layout.row()
         row.label('LiVi Radiance type:')
-        radentry = cm.radmat(context.scene, 1)
+        row.prop(cm, 'radmatmenu')
         row = layout.row()
-        for line in radentry.splitlines():
-            row = layout.row()
-            row.label('    '+line)
-        layout = self.layout
+        for prop in cm.radmatdict[cm.radmatmenu]:
+            if prop:
+                 row.prop(cm, prop)
+            else:
+                row = layout.row()
         row = layout.row()
         row.label("-----------------------------------------")
         newrow(layout, "EnVi Construction Type:", cm, "envi_con_type")
@@ -296,17 +276,27 @@ class VIMatPanel(bpy.types.Panel):
             elif cm.envi_con_makeup == '0':
                 thicklist = ("envi_export_lo_thi", "envi_export_l1_thi", "envi_export_l2_thi", "envi_export_l3_thi", "envi_export_l4_thi")
                 propdict = {'Wall': (envi_cons.wall_con, 'envi_export_wallconlist', cm.envi_export_wallconlist), 'Floor': (envi_cons.floor_con, 'envi_export_floorconlist', cm.envi_export_floorconlist), 
-                'Roof': (envi_cons.roof_con, 'envi_export_roofconlist', cm.envi_export_roofconlist), 'Door': (envi_cons.door_con, 'envi_export_doorconlist', cm.envi_export_doorconlist)} 
+                'Roof': (envi_cons.roof_con, 'envi_export_roofconlist', cm.envi_export_roofconlist), 'Door': (envi_cons.door_con, 'envi_export_doorconlist', cm.envi_export_doorconlist), 'Window': (envi_cons.glaze_con, 'envi_export_glazeconlist', cm.envi_export_glazeconlist)} 
                 
                 row = layout.row()                
                 row.prop(cm, propdict[cm.envi_con_type][1])
-                row = layout.row()
+                
                 for l, layername in enumerate(propdict[cm.envi_con_type][0][propdict[cm.envi_con_type][2]]):
+                    row = layout.row()
                     row.label(text = layername)
-                    if layername not in envi_mats.gas_dat:
+                    if layername in envi_mats.wgas_dat:
+                        row.prop(cm, thicklist[l])
+                        row.label(text = "default: 14mm")
+                    elif layername in envi_mats.gas_dat:
+                        row.prop(cm, thicklist[l])
+                        row.label(text = "default: 20-50mm")
+                    elif layername in envi_mats.glass_dat:
+                        row.prop(cm, thicklist[l])
+                        row.label(text = "default: "+str(float(envi_mats.matdat[layername][3])*1000)+"mm")
+                    else:
                         row.prop(cm, thicklist[l])
                         row.label(text = "default: "+str(envi_mats.matdat[layername][7])+"mm")
-                    row = layout.row()
+
 
 #                if cm.envi_con_type == 'Door':
 #                    row.prop(cm, "envi_export_doorconlist")
@@ -317,8 +307,8 @@ class VIMatPanel(bpy.types.Panel):
 #                        row.label(text = "default: "+str(envi_mats.matdat[layername][7])+"mm")
 #                        row = layout.row()
 
-                if cm.envi_con_type == 'Window':
-                    row.prop(cm, "envi_export_glazeconlist")
+#                if cm.envi_con_type == 'Window':
+#                    row.prop(cm, "envi_export_glazeconlist")
 
 class IESPanel(bpy.types.Panel):
     bl_label = "LiVi IES file"

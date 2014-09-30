@@ -6,7 +6,7 @@ bl_info = {
     "api":"",
     "location": "Node Editor & 3D View > Properties Panel",
     "description": "Radiance/EnergyPlus exporter and results visualiser",
-    "warning": "This is a beta script. Some functionality is buggy",
+    "warning": "This is a beta script. Some functionality is buggy, very buggy",
     "wiki_url": "",
     "tracker_url": "",
     "category": "Import-Export"}
@@ -173,6 +173,19 @@ def register():
 
 # LiVi material definitions
     Material.radmat = vi_func.radmat
+    Material.radmatdict = {'0': ['radcolour', 0, 'radrough', 'radspec'], '1': ['radcolour'], '2': ['radcolour', 0, 'ior'], '3': ['radcolour', 0, 'radspec', 'radrough', 0, 'radtrans',  'radtranspec'], '4': ['radcolour'], '5': ['radcolour'], '6': ['radcolour', 0, 'radrough', 'radspec'], '7': []}
+
+    radtypes = [('0', 'Plastic', 'Plastic Radiance material'), ('1', 'Glass', 'Glass Radiance material'), ('2', 'Dielectric', 'Dialectric Radiance material'),
+                ('3', 'Translucent', 'Translucent Radiance material'), ('4', 'Mirror', 'Mirror Radiance material'), ('5', 'Light', 'Emission Radiance material'),
+                ('6', 'Metal', 'Metal Radiance material'), ('7', 'Anti-matter', 'Antimatter Radiance material')]
+    Material.radmatmenu = eprop(radtypes, "", "Type of Radiance material", '0')
+    Material.radcolour = fvprop(3, "Material Colour",'Material Colour', [1.0, 1.0, 1.0], 'COLOR', 0, 1)
+    Material.radrough = fprop("Roughness", "Material roughness", 0, 1, 0.1)
+    Material.radspec = fprop("Specularity", "Material specularity", 0, 1, 0.1)
+#    Material.radspec = fprop("Transmissivity", "Material specularity", 0, 1, 0.1)
+    Material.radtrans = fprop("Specular trans.", "Material transmissivity", 0, 1, 0.1)
+    Material.radtranspec  = fprop("Specularity", "Material specular transmission", 0, 1, 0.1)
+    Material.radior  = fprop("IOR", "Material index of refractionn", 0, 5, 1.5)
     Material.vi_shadow = bprop("VI Shadow", "Flag to signify whether the material represents a VI Shadow sensing surface", False)
     Material.livi_sense = bprop("LiVi Sensor", "Flag to signify whether the material represents a LiVi sensing surface", False)
     Material.livi_compliance = bprop("LiVi Compliance Surface", "Flag to siginify whether the material represents a LiVi compliance surface", False)
@@ -181,7 +194,8 @@ def register():
     rspacetype = [('0', "Kitchen", "Kitchen space"), ('1', "Living/Dining/Study", "Living/Dining/Study area"), ('2', "Communal", "Non-residential or communal area")]
     respacetype = [('0', "Sales", "Sales space"), ('1', "Occupied", "Occupied space")]
     Material.hspacemenu = eprop(hspacetype, "", "Type of healthcare space", '0')
-    Material.rspacemenu = eprop(rspacetype, "", "Type of residential space", '0')
+    Material.brspacemenu = eprop(rspacetype, "", "Type of residential space", '0')
+    Material.crspacemenu = eprop(rspacetype[:2], "", "Type of residential space", '0')
     Material.respacemenu = eprop(respacetype, "", "Type of retail space", '0')
 
 # EnVi material definitions
@@ -285,6 +299,7 @@ def register():
 #    Scene.latitude = bpy.props.FloatProperty(name="Latitude", description="Site Latitude", min=-90, max=90, default=52)
 #    Scene.longitude = bpy.props.FloatProperty(name="Longitude", description="Site Longitude", min=-180, max=180, default=0)
     Scene.li_disp_panel = iprop("Display Panel", "Shows the Display Panel", -1, 2, 0)
+    Scene.li_disp_count = iprop("", "", 0, 1000, 0)
     Scene.vi_disp_3d = bprop("VI 3D display", "Boolean for 3D results display",  False)
     Scene.vi_disp_3dlevel = bpy.props.FloatProperty(name = "", description = "Level of 3D result plane extrusion", min = 0, max = 500, default = 0, update = eupdate)
     Scene.ss_disp_panel = iprop("Display Panel", "Shows the Display Panel", -1, 2, 0)
@@ -293,12 +308,13 @@ def register():
     Scene.vi_display_rp_fs = iprop("", "Point result font size", 4, 48, 9)
     Scene.vi_display_rp_fc = fvprop(4, "", "Font colour", [0.0, 0.0, 0.0, 1.0], 'COLOR', 0, 1)
     Scene.vi_display_rp_fsh = fvprop(4, "", "Font shadow", [0.0, 0.0, 0.0, 1.0], 'COLOR', 0, 1)
+    Scene.vi_display_rp_off = fprop("", "Surface offset for number display", 0, 1, 0.001)
     Scene.li_projname = sprop("", "Name of the building project", 1024, '')
     Scene.li_assorg = sprop("", "Name of the assessing organisation", 1024, '')
     Scene.li_assind = sprop("", "Name of the assessing individual", 1024, '')
     Scene.li_jobno = sprop("", "Project job number", 1024, '')
     Scene.resnode = sprop("", "", 0, "")
-    Scene.restree = sprop("", "", 0, "")    
+    Scene.restree = sprop("", "", 0, "")   
 
     nodeitems_utils.register_node_categories("Vi Nodes", vinode_categories)
     nodeitems_utils.register_node_categories("EnVi Nodes", envinode_categories)

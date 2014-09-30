@@ -1,7 +1,7 @@
-import bpy, bpy_extras, sys, datetime, mathutils, os, shlex, time
+import bpy, bpy_extras, sys, datetime, mathutils, os, time
 from os import rename
 import bpy_extras.io_utils as io_utils
-from subprocess import Popen, PIPE, call
+from subprocess import Popen, PIPE
 
 try:
     import numpy
@@ -22,13 +22,12 @@ try:
 except:
     mp = 0
 
-from .livi_export import radcexport, radgexport, cyfc1
+from .livi_export import radcexport, radgexport, cyfc1, createoconv, createradfile
 from .livi_calc  import li_calc, resapply
 from .vi_display import li_display, li_compliance, linumdisplay, spnumdisplay, li3D_legend, viwr_legend
 from .envi_export import enpolymatexport, pregeo
 from .envi_mat import envi_materials, envi_constructions
-from .envi_calc import envi_sim
-from .vi_func import processf, livisimacc, solarPosition, retobjs, wr_axes, clearscene, framerange, vcframe, viparams, objmode, nodecolour
+from .vi_func import processf, livisimacc, solarPosition, vertarea, wr_axes, clearscene, framerange, vcframe, viparams, objmode, nodecolour, li_calcob
 from .vi_chart import chart_disp
 from .vi_gen import vigen
 
@@ -189,6 +188,8 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
     
     def invoke(self, context, event):
         node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
+        locnode = 0 if node.bl_label == 'LiVi Compliance' else node.inputs['Location in'].links[0].from_node
+        geonode = node.outputs['Context out'].links[0].to_node.inputs['Geometry in'].links[0].from_node if node.bl_label == 'LiVi CBDM' else 0
         node.export(context)
         scene = context.scene
         viparams(scene)
@@ -203,23 +204,15 @@ class NODE_OT_LiExport(bpy.types.Operator, io_utils.ExportHelper):
         if bpy.data.filepath:
             objmode()
             if " " not in bpy.data.filepath:
-                if ('LiVi CBDM' in node.bl_label and node.inputs['Geometry in'].is_linked and (node.inputs['Location in'].is_linked or node.sm != '0')) \
-                or ('LiVi CBDM' not in node.bl_label and node.inputs['Geometry in'].is_linked):
-                    scene.li_compliance = 1 if node.bl_label == 'LiVi Compliance' else 0
-                    radcexport(self, node)
-                    node.exported = True
-                    node.outputs['Context out'].hide = False
-                    node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
-                else:
-                    self.report({'ERROR'},"Required input nodes are not linked")
-                    node.outputs['Context out'].hide = True
+                scene.li_compliance = 1 if node.bl_label == 'LiVi Compliance' else 0
+                radcexport(self, node, locnode, geonode)
             else:
-                node.outputs['Context out'].hide = True
+#                    node.outputs['Context out'].hide = True
                 self.report({'ERROR'},"The directory path or Blender filename has a space in it. Please save again without any spaces")
                 return {'FINISHED'}
             return {'FINISHED'}
         else:
-            node.outputs['Context out'].hide = True
+#                node.outputs['Context out'].hide = True
             self.report({'ERROR'},"Save the Blender file before exporting")
             return {'FINISHED'}
 
@@ -231,23 +224,38 @@ class NODE_OT_RadPreview(bpy.types.Operator, io_utils.ExportHelper):
     bl_undo = True
 
     nodeid = bpy.props.StringProperty()
-    
+        
     def invoke(self, context, event):
         scene = context.scene
         viparams(scene)
         objmode()
-        scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
-        simnode = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
-        connode, geonode =  simnode.export()  
+#        scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
+        simnode, frame = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]], scene.frame_current
+        connode, geonode =  simnode.export(self.bl_label) 
+        if frame not in range(scene.fs, scene.fe + 1):
+            self.report({'ERROR'}, "Current frame is not within the exported frame range")
+            return {'CANCELLED'}
+        if not simnode.edit_file:
+            createradfile(scene, frame, self, connode, geonode)
+        elif not os.path.isfile(os.path.join(scene['viparams']['newdir'], scene['viparams']['filename']+'-{}.rad'.format(frame))):
+            self.report({'ERROR'}, "There is no saved radiance input file. Turn off the edit file option")
+            return {'CANCELLED'}
+        createoconv(scene, frame, self)
+
         if os.path.isfile("{}-{}.rad".format(scene['viparams']['filebase'], scene.frame_current)):
             cam = scene.camera
             if cam:
                 cang = '180 -vth' if connode.analysismenu == '3' else cam.data.angle*180/pi
                 vv = 180 if connode.analysismenu == '3' else cang * scene.render.resolution_y/scene.render.resolution_x
-                rvucmd = "rvu -w -n {0} -vv {1} -vh {2} -vd {3[0][2]:.3f} {3[1][2]:.3f} {3[2][2]:.3f} -vp {4[0]:.3f} {4[1]:.3f} {4[2]:.3f} {5} {6}-{7}.oct".format(scene['viparams']['nproc'], vv, cang, -1*cam.matrix_world, cam.location, simnode['radparams'], scene['viparams']['filebase'], scene.frame_current)
+                vd = (0.001, 0, -1*cam.matrix_world[2][2]) if (round(-1*cam.matrix_world[0][2], 3), round(-1*cam.matrix_world[1][2], 3)) == (0.0, 0.0) else [-1*cam.matrix_world[i][2] for i in range(3)]
+                rvucmd = "rvu -w -n {0} -vv {1} -vh {2} -vd {3[0]:.3f} {3[1]:.3f} {3[2]:.3f} -vp {4[0]:.3f} {4[1]:.3f} {4[2]:.3f} {5} {6}-{7}.oct".format(scene['viparams']['nproc'], vv, cang, vd, cam.location, simnode['radparams'], scene['viparams']['filebase'], scene.frame_current)               
                 rvurun = Popen(rvucmd.split(), stdout = PIPE, stderr = PIPE)
                 time.sleep(0.1)
-                if rvurun.poll() is not None:
+                if rvurun.poll() is not None:                    
+                    for line in rvurun.stderr:
+                        if 'view up parallel to view direction' in line.decode():
+                            self.report({'ERROR'}, "Camera connot point directly upwards")
+                            return {'CANCELLED'}
                     self.report({'ERROR'}, "Something wrong with the Radiance preview. Try rerunning the geometry and context export")
                     return {'CANCELLED'}
                 return {'FINISHED'}    
@@ -317,8 +325,16 @@ class NODE_OT_LiVIGlare(bpy.types.Operator):
         self.cam = self.scene.camera
         if self.cam:
             self.simnode = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
-            self.connode, self.geonode = self.simnode.export()
+            self.connode, self.geonode = self.simnode.export(self.bl_label)
             self.frame = self.scene.fs
+            for frame in range(self.scene.fs, self.scene.fe + 1):
+                if not self.simnode.edit_file:
+                    createradfile(self.scene, frame, self.connode, self.geonode)
+                elif not os.path.isfile(os.path.join(self.scene['viparams']['newdir'], self.scene['viparams']['filename']+'-{}.rad'.format(frame))):
+                    self.report({'ERROR'}, "There is no saved radiance input file. Turn off the edit file option")
+                    return {'CANCELLED'}
+                createoconv(self.scene, frame, self)
+
             rpictcmd = "rpict -w -vth -vh 180 -vv 180 -x 800 -y 800 -vd {0[0][2]} {0[1][2]} {0[2][2]} -vp {1[0]} {1[1]} {1[2]} {2} {3}-{4}.oct".format(-1*self.cam.matrix_world, self.cam.location, self.simnode['radparams'], self.scene['viparams']['filebase'], self.frame)               
             glarerun = Popen(rpictcmd.split(), stdout = PIPE)
             egcmd = 'evalglare -c {}.hdr'.format(os.path.join(self.scene['viparams']['newdir'], 'glare'+str(self.frame)))
@@ -330,7 +346,7 @@ class NODE_OT_LiVIGlare(bpy.types.Operator):
 
 class NODE_OT_LiViCalc(bpy.types.Operator):
     bl_idname = "node.livicalc"
-    bl_label = "Radiance Export and Simulation"
+    bl_label = "Radiance Simulation"
 
     nodeid = bpy.props.StringProperty()
 
@@ -338,36 +354,35 @@ class NODE_OT_LiViCalc(bpy.types.Operator):
         scene = context.scene
         viparams(scene)
         objmode()
-        scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
+        scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel, scene.li_disp_count = 0, 0, 0, 0, 0, 0, 0, 0
         clearscene(scene, self)
         simnode = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
-        connode, geonode = simnode.export()
+        connode, geonode = simnode.export(self.bl_label)
+        
+        for frame in range(scene.fs, scene.fe + 1):
+            if not simnode.edit_file:
+                createradfile(scene, frame, self, connode, geonode)
+            elif not os.path.isfile(os.path.join(scene['viparams']['newdir'], scene['viparams']['filename']+'-{}.rad'.format(frame))):
+                self.report({'ERROR'}, "There is no saved radiance input file. Turn off the edit file option")
+                return {'CANCELLED'}
+            createoconv(scene, frame, self)
         scene['LiViContext'] = connode.bl_label
-
-        for geo in retobjs('livig'):
-            geo.licalc = any([m.livi_sense for m in geo.data.materials])
-        geogennode = geonode.outputs['Generative out'].links[0].to_node if geonode.outputs['Generative out'].is_linked else 0
-
+       
         if connode.bl_label == 'LiVi Basic':
-            tarnode = connode.outputs['Target out'].links[0].to_node if connode.outputs['Target out'].is_linked else 0
+            geogennode = geonode.inputs['Generative in'].links[0].from_node if geonode.inputs['Generative in'].links else 0
+            tarnode = connode.inputs['Target in'].links[0].from_node if connode.inputs['Target in'].is_linked else 0
             if geogennode and tarnode:
                 simnode['Animation'] = 'Animated'
                 vigen(self, li_calc, resapply, geonode, connode, simnode, geogennode, tarnode)
-                scene.vi_display = 1
             elif connode.analysismenu != '3':
                 simnode['Animation'] = 'Animated' if scene.gfe > 0 or scene.cfe > 0 else 'Static'
                 li_calc(self, simnode, connode, geonode, livisimacc(simnode, connode))
-                scene.vi_display = 1
-#            else:
-#                simnode['Animation'] = 'Animated' if scene.gfe > 0 or scene.cfe > 0 else 'Static'
-#                li_glare(self, simnode, connode, geonode)
-#                scene.vi_display = 0
         else:
             simnode['Animation'] = 'Animated' if scene.gfe > 0 or scene.cfe > 0 else 'Static'
             scene.fs = scene.frame_current if simnode['Animation'] == 'Static' else scene.frame_start
             scene.fe = scene.frame_current if simnode['Animation'] == 'Static' else scene.frame_end
             li_calc(self, simnode, connode, geonode, livisimacc(simnode, connode))
-            scene.vi_display = 1
+        scene.vi_display = 1 if connode.analysismenu != '3' or connode.bl_label != 'LiVi CBDM' else 0  
         context.scene.fe = framerange(context.scene, simnode['Animation'])[-1]
         (scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel) = (0, 1, 1, 0, 0, 0) if connode.bl_label == 'LiVi Compliance'  else (0, 1, 0, 0, 0, 0)
         context.scene.resnode = simnode.name
@@ -382,9 +397,10 @@ class VIEW3D_OT_LiDisplay(bpy.types.Operator):
     bl_undo = True
 
     _handle = None
-
+    disp =  bpy.props.IntProperty(default = 1)
+    
     def modal(self, context, event):
-        if context.scene.li_disp_panel != 2 and context.scene.ss_disp_panel != 2:
+        if (context.scene.li_disp_panel < 2 and context.scene.ss_disp_panel < 2) or self.disp != context.scene.li_disp_count:            
             bpy.types.SpaceView3D.draw_handler_remove(self._handle_leg, 'WINDOW')
             bpy.types.SpaceView3D.draw_handler_remove(self._handle_pointres, 'WINDOW')
             if context.scene.get('LiViContext') == 'LiVi Compliance':
@@ -396,20 +412,21 @@ class VIEW3D_OT_LiDisplay(bpy.types.Operator):
             return {'CANCELLED'}
         return {'PASS_THROUGH'}
 
-    def invoke(self, context, event):
-        scene = bpy.context.scene
+    def execute(self, context):        
+        scene = context.scene 
+        scene.li_disp_count += 1
+        self.disp = scene.li_disp_count
         simnode = bpy.data.node_groups[scene.restree].nodes[scene.resnode]
-        connode = 0 if simnode.bl_label == 'VI Shadow Study' else simnode.inputs['Context in'].links[0].from_node
-        geonode = 0 if simnode.bl_label == 'VI Shadow Study' else connode.inputs['Geometry in'].links[0].from_node
+        (connode, geonode) = (0, 0) if simnode.bl_label == 'VI Shadow Study' else (simnode.export(self.bl_label))
         li_display(simnode, connode, geonode)
         scene.li_disp_panel, scene.ss_disp_panel = 2, 2
         self._handle_pointres = bpy.types.SpaceView3D.draw_handler_add(linumdisplay, (self, context, simnode, connode, geonode), 'WINDOW', 'POST_PIXEL')
         self._handle_leg = bpy.types.SpaceView3D.draw_handler_add(li3D_legend, (self, context, simnode, connode, geonode), 'WINDOW', 'POST_PIXEL')
-        if context.scene.get('LiViContext') == 'LiVi Compliance':
-            self._handle_comp = bpy.types.SpaceView3D.draw_handler_add(li_compliance, (self, context, connode), 'WINDOW', 'POST_PIXEL')
         context.window_manager.modal_handler_add(self)
+        if context.scene.get('LiViContext') == 'LiVi Compliance':
+            self._handle_comp = bpy.types.SpaceView3D.draw_handler_add(li_compliance, (self, context, connode), 'WINDOW', 'POST_PIXEL')        
         return {'RUNNING_MODAL'}
-
+        
 class IES_Select(bpy.types.Operator, io_utils.ImportHelper):
     bl_idname = "livi.ies_select"
     bl_label = "Select IES file"
@@ -445,7 +462,7 @@ class NODE_OT_ESOSelect(bpy.types.Operator, io_utils.ImportHelper):
     bl_undo = True
 
     nodeid = bpy.props.StringProperty()
-
+    
     def draw(self,context):
         layout = self.layout
         row = layout.row()
@@ -586,7 +603,7 @@ class NODE_OT_EnGExport(bpy.types.Operator):
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 0, 0, 0, 0, 0, 0, 0
         node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
         pregeo(self)
-        node.exported = True
+        node.export()
         node.outputs[0].hide = False
         return {'FINISHED'}
 
@@ -620,6 +637,7 @@ class NODE_OT_EnExport(bpy.types.Operator, io_utils.ExportHelper):
             elif " " in str(node.filename):
                 self.report({'ERROR'},"The Blender filename has a space in it.")
                 return {'FINISHED'}
+            node.export()
             return {'FINISHED'}
         else:
             self.report({'ERROR'},"Save the Blender file before exporting")
@@ -642,7 +660,6 @@ class NODE_OT_EnSim(bpy.types.Operator, io_utils.ExportHelper):
                 try:
                     with open(os.path.join(scene['viparams']['newdir'], 'eplusout.eso'), 'r') as resfile:                    
                         for line in [line for line in resfile.readlines()[::-1] if line.split(',')[0] == '2' and len(line.split(',')) == 9]:  
-#                            if line.split(',')[0] == '2' and len(line.split(',')) == 9:
                             self.simnode.run = int(100 * int(line.split(',')[1])/(self.simnode.dedoy - self.simnode.dsdoy))
                             break
                     return {'RUNNING_MODAL'}
@@ -670,7 +687,6 @@ class NODE_OT_EnSim(bpy.types.Operator, io_utils.ExportHelper):
                     nodecolour(self.simnode, 0)
                     processf(self, self.simnode)
                     self.report({'INFO'}, "Calculation is finished.") 
-                    self.simnode.outputs['Results out'].hide = False
                     if self.simnode.outputs[0].links:
                         socket1, socket2  = self.simnode.outputs[0], self.simnode.outputs[0].links[0].to_socket
                         bpy.data.node_groups[self.nodeid.split('@')[1]].links.remove(self.simnode.outputs[0].links[0])
@@ -709,7 +725,10 @@ class NODE_OT_Chart(bpy.types.Operator, io_utils.ExportHelper):
         Sdate = dt.fromordinal(dt(dt.now().year, 1, 1).toordinal() + node['Start'] -1) + datetime.timedelta(hours = node.dsh - 1)
         Edate = dt.fromordinal(dt(dt.now().year, 1, 1).toordinal() + node['End'] -1 ) + datetime.timedelta(hours = node.deh - 1)
         innodes = list(OrderedDict.fromkeys([inputs.links[0].from_node for inputs in node.inputs if inputs.links]))
-        chart_disp(self, node, innodes, Sdate, Edate)
+        if not mp:
+            self.report({'ERROR'},"Matplotlib cannot be found by the Python installation used by Blender")
+            return {'CANCELLED'}
+        chart_disp(plt, node, innodes, Sdate, Edate)
         return {'FINISHED'}
 
 class NODE_OT_FileProcess(bpy.types.Operator, io_utils.ExportHelper):
@@ -724,8 +743,7 @@ class NODE_OT_FileProcess(bpy.types.Operator, io_utils.ExportHelper):
     def invoke(self, context, event):
         node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
         processf(self, node)
-        node.outputs['Context out'].hide = False
-        node.bl_label = node.bl_label[1:] if node.bl_label[0] == '*' else node.bl_label
+        node.export()
         return {'FINISHED'}
 
 class NODE_OT_SunPath(bpy.types.Operator):
@@ -736,10 +754,11 @@ class NODE_OT_SunPath(bpy.types.Operator):
     bl_undo = True
 
     nodeid = bpy.props.StringProperty()
-
+    
     def invoke(self, context, event):
         solringnum, sd, numpos, ordinals = 0, 100, {}, []
         node = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
+        node.export()
         scene, scene.resnode, scene.restree = context.scene, node.name, self.nodeid.split('@')[1]
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 1, 1, 0, 0, 0, 0, 0
         bpy.context.scene.cursor_location = (0.0, 0.0, 0.0)
@@ -747,21 +766,9 @@ class NODE_OT_SunPath(bpy.types.Operator):
         for mat in [mat for mat in matdict.items() if mat[0] not in bpy.data.materials]:
             bpy.data.materials.new(mat[0])
             bpy.data.materials[mat[0]].diffuse_color = mat[1]
-#        if 'SolEquoRings' not in [mat.name for mat in bpy.data.materials]:
-#            bpy.data.materials.new('SolEquoRings')
-#            bpy.data.materials['SolEquoRings'].diffuse_color = (1, 0, 0)
-#        if 'HourRings' not in [mat.name for mat in bpy.data.materials]:
-#            bpy.data.materials.new('HourRings')
-#            bpy.data.materials['HourRings'].diffuse_color = (1, 1, 0)
-#        if 'SPBase' not in [mat.name for mat in bpy.data.materials]:
-#            bpy.data.materials.new('SPBase')
-#            bpy.data.materials['SPBase'].diffuse_color = (1, 1, 1)
-#        if 'Sun' not in [mat.name for mat in bpy.data.materials]:
-#            bpy.data.materials.new('Sun')
-#            bpy.data.materials['Sun'].diffuse_color = (1, 1, 1)
+            
         if 'SUN' in [ob.data.type for ob in context.scene.objects if ob.data == 'LAMP' and ob.hide == False]:
             [ob.data.type for ob in context.scene.objects if ob.data == 'LAMP' and ob.data.type == 'SUN'][0]['VIType'] = 'Sun'
-
         elif 'Sun' not in [ob.get('VIType') for ob in context.scene.objects]:
             bpy.ops.object.lamp_add(type = "SUN")
             sun = context.active_object
@@ -816,12 +823,10 @@ class NODE_OT_SunPath(bpy.types.Operator):
             if spathmesh.vertices[v].co.z > 0 or spathmesh.vertices[v - 24].co.z > 0:
                 spathmesh.edges.add(1)
                 spathmesh.edges[-1].vertices[0:2] = (v, v - 24)
-#                spathmesh.edges[-1].vertices[1] = v - 24
             if v in range(1224, 1248):
                 if spathmesh.vertices[v].co.z > 0 or spathmesh.vertices[v - 1224].co.z > 0:
                     spathmesh.edges.add(1)
                     spathmesh.edges[-1].vertices[0:2] = (v, v - 1224)
-#                    spathmesh.edges[-1].vertices[1] = v - 1224
 
         for doy in (79, 172, 355):
             for hour in range(1, 25):
@@ -835,32 +840,23 @@ class NODE_OT_SunPath(bpy.types.Operator):
                         spathmesh.edges.add(1)
                         solringnum += 1
                         spathmesh.edges[-1].vertices = (spathmesh.vertices[-2].index, spathmesh.vertices[-1].index)
-#                        spathmesh.edges[-1].vertices[1] = spathmesh.vertices[-1].index
                 if hour == 24:
                     if spathmesh.vertices[-24].co.z > 0 or spathmesh.vertices[-1].co.z > 0:
                         spathmesh.edges.add(1)
                         solringnum += 1
                         spathmesh.edges[-1].vertices = (spathmesh.vertices[-24].index, spathmesh.vertices[-1].index)
-#                        spathmesh.edges[-1].vertices[1] = spathmesh.vertices[-1].index
 
         for edge in spathmesh.edges:
             intersect = mathutils.geometry.intersect_line_plane(spathmesh.vertices[edge.vertices[0]].co, spathmesh.vertices[edge.vertices[1]].co, mathutils.Vector((0,0,0)), mathutils.Vector((0,0,1)))
             for vert in [vert for vert in (spathmesh.vertices[edge.vertices[0]], spathmesh.vertices[edge.vertices[1]]) if vert.co.z < 0]:
                 vert.co = intersect
-#            if spathmesh.vertices[edge.vertices[0]].co.z < 0:
-#                spathmesh.vertices[edge.vertices[0]].co = intersect
-#            if spathmesh.vertices[edge.vertices[1]].co.z < 0:
-#                spathmesh.vertices[edge.vertices[1]].co = intersect
 
         bpy.ops.object.convert(target='CURVE')
         spathob.data.bevel_depth, spathob.data.bevel_resolution = 0.08, 6
-#        spathob.data.bevel_resolution = 6
         bpy.context.object.data.fill_mode = 'FULL'
         bpy.ops.object.convert(target='MESH')
-
         bpy.ops.object.material_slot_add()
         spathob.material_slots[0].material, spathob['numpos'] = bpy.data.materials['HourRings'], numpos
-#        spathob['numpos'] = numpos
 
         for vert in spathob.data.vertices[0:16 * (solringnum + 3)]:
             vert.select = True
@@ -887,8 +883,6 @@ class NODE_OT_SunPath(bpy.types.Operator):
             bpy.ops.object.text_add(view_align=False, enter_editmode=False, location=((-4, -8)[c%2], sd*1.025, 0.0), rotation=(0.0, 0.0, 0.0))
             txt = bpy.context.active_object
             txt.scale, txt.data.extrude, txt.data.body  = (10, 10, 10), 0.1, ('N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW')[c]
-#            txt.data.extrude = 0.1
-#            txt.data.body = ('N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW')[c]
             bpy.ops.object.convert(target='MESH')
             bpy.ops.object.material_slot_add()
             txt.material_slots[0].material = bpy.data.materials['SPBase']
@@ -948,17 +942,18 @@ class NODE_OT_WindRose(bpy.types.Operator):
             return {'CANCELLED'}
         if mp == 1:
             simnode = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
-            locnode = simnode.inputs[0].links[0].from_node
+            simnode.export()
+            locnode = simnode.inputs['Location in'].links[0].from_node
             scene, scene.resnode, scene.restree = context.scene, simnode.name, self.nodeid.split('@')[1]
             viparams(scene)
             scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 1, 0, 0, 0, 0, 0, 1
 
             with open(locnode.weather, "r") as epwfile:
-                if locnode.startmonth > locnode.endmonth:
+                if simnode.startmonth > simnode.endmonth:
                     self.report({'ERROR'},"Start month is later than end month")
                     return {'FINISHED'}
                 else:
-                    wvals = [line.split(",")[20:22] for l, line in enumerate(epwfile.readlines()) if l > 7 and locnode.startmonth <= int(line.split(",")[1]) < locnode.endmonth]
+                    wvals = [line.split(",")[20:22] for l, line in enumerate(epwfile.readlines()) if l > 7 and simnode.startmonth <= int(line.split(",")[1]) <= simnode.endmonth]
                     simnode['maxres'], simnode['minres'],  simnode['avres']= max([float(w[1]) for w in wvals]), min([float(w[1]) for w in wvals]), sum([float(w[1]) for w in wvals])/len(wvals)
 
             awd, aws, (fig, ax) = [float(val[0]) for val in wvals], [float(val[1]) for val in wvals], wr_axes()
@@ -993,15 +988,13 @@ class NODE_OT_WindRose(bpy.types.Operator):
                 [w, h] = [int(d) for d in fig.bbox.bounds[2:]]
                 pixarray = numpy.frombuffer(pixbuffer, numpy.uint8)
                 pixarray.shape = h, w, 4
-                for hi in reversed(pixarray):
-                    for wi in hi:
-                        pixels += [p/255 for p in wi]
+                pixels = pixarray[::-1].flatten()/255
 
                 if 'disp_wind.png' not in [im.name for im in bpy.data.images]:
                     wrim = bpy.data.images.new('disp_wind.png', height = h, width = w)
                     wrim.file_format = 'PNG'
-                    wrim.filepath = os.path.join(locnode.newdir, wrim.name)
-                    wrim.save()
+                    wrim.filepath = os.path.join(scene['viparams']['newdir'], wrim.name)
+#                    wrim.save()
                 else:
                     wrim = bpy.data.images['disp_wind.png']
                 wrim.pixels = pixels
@@ -1010,10 +1003,6 @@ class NODE_OT_WindRose(bpy.types.Operator):
                 wrim.reload()
 
             plt.savefig(scene['viparams']['newdir']+'/disp_wind.svg')
-
-#            else:
-#                self.report({'ERROR'},"No project directory. Save the Blender file and recreate the VI Location node.")
-#                return {'CANCELLED'}
 
             if 'Wind_Plane' not in [ob.get('VIType') for ob in bpy.context.scene.objects]:
                 bpy.ops.mesh.primitive_plane_add(enter_editmode=False, location=(0.0, 0.0, 0.0))
@@ -1075,6 +1064,7 @@ class NODE_OT_Shadow(bpy.types.Operator):
         scene.vi_display, scene.sp_disp_panel, scene.li_disp_panel, scene.lic_disp_panel, scene.en_disp_panel, scene.ss_disp_panel, scene.wr_disp_panel = 1, 0, 0, 0, 0, 1, 0
         clearscene(scene, self)
         simnode = bpy.data.node_groups[self.nodeid.split('@')[1]].nodes[self.nodeid.split('@')[0]]
+        simnode.export()
         (scene.fs, scene.fe) = (scene.frame_current, scene.frame_current) if simnode.animmenu == 'Static' else (scene.frame_start, scene.frame_end)
 
         if simnode.starthour > simnode.endhour:
@@ -1085,17 +1075,12 @@ class NODE_OT_Shadow(bpy.types.Operator):
         if simnode['Animation'] == 'Static':
             scmaxres, scminres, scavres, scene.fs = [0], [100], [0], scene.frame_current
         else:
-#            (scmaxres, scminres, scacres) = zip([0], [100], [0] for f in range(scene.frame_end - scene.frame_start + 1))
             (scmaxres, scminres, scavres) = [[x] * scene.frame_end - scene.frame_start + 1 for x in (0, 100, 0)]
-#            scmaxres = [0 for f in range(scene.frame_end - scene.frame_start + 1)]
-#            scminres = [100 for f in range(scene.frame_end - scene.frame_start + 1)]
-#            scavres = [0 for f in range(scene.frame_end - scene.frame_start + 1)]
 
         fdiff =  1 if simnode['Animation'] == 'Static' else scene.frame_end - scene.frame_start + 1
-        locnode = simnode.inputs[0].links[0].from_node
-        time = datetime.datetime(datetime.datetime.now().year, locnode.startmonth, 1, simnode.starthour - 1)
-        y =  datetime.datetime.now().year if locnode.endmonth >= locnode.startmonth else datetime.datetime.now().year + 1
-        endtime = datetime.datetime(y, locnode.endmonth, (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[locnode.endmonth - 1], simnode.endhour - 1)
+        time = datetime.datetime(datetime.datetime.now().year, simnode.startmonth, 1, simnode.starthour - 1)
+        y =  datetime.datetime.now().year if simnode.endmonth >= simnode.startmonth else datetime.datetime.now().year + 1
+        endtime = datetime.datetime(y, simnode.endmonth, (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[simnode.endmonth - 1], simnode.endhour - 1)
         interval = datetime.timedelta(hours = modf(simnode.interval)[0], minutes = 60 * modf(simnode.interval)[1])
         while time <= endtime:
             if simnode.starthour <= time.hour <= simnode.endhour:
@@ -1103,38 +1088,61 @@ class NODE_OT_Shadow(bpy.types.Operator):
                 if beta > 0:
                     direcs.append(mathutils.Vector((-sin(phi), -cos(phi), tan(beta))))
             time += interval
-
         for ob in [ob for ob in scene.objects if ob.type == 'MESH' and not ob.hide]:
-            obavres, shadfaces, shadcentres = [0] * (fdiff), [[] for f in range(fdiff)], [[] for f in range(fdiff)]
-            [obsumarea, obmaxres, obminres] = [[0 for f in range(fdiff)] for x in range(3)]
-            if len([mat for mat in ob.data.materials if mat and mat.get('vi_shadow')]) > 0:
+            if li_calcob(ob, 'shadow'):
+                obavres, shadfaces, shadcentres = [0] * (fdiff), [[] for f in range(fdiff)], [[] for f in range(fdiff)]
+                [obsumarea, obmaxres, obminres] = [[0 for f in range(fdiff)] for x in range(3)]
                 obcalclist.append(ob)
-                scene.objects.active, ob.licalc, obm = ob, 1, ob.matrix_world
-                ob['cfaces'], ob['cverts'] = [face.index for face in ob.data.polygons if ob.data.materials[face.material_index].vi_shadow], []
-
+                scene.objects.active, obm = ob, ob.matrix_world
+                ob['cfaces'] = [face.index for face in ob.data.polygons if ob.data.materials[face.material_index].vi_shadow]
+                
                 while ob.data.vertex_colors:
                     bpy.ops.mesh.vertex_color_remove()
                 for findex, frame in enumerate(range(scene.fs, scene.fe + 1)):
                     scene.frame_set(frame)
                     bpy.ops.mesh.vertex_color_add()
                     ob.data.vertex_colors[-1].name = '{}'.format(frame)
-                    vertexColor = ob.data.vertex_colors[-1]
+                    vertexColour = ob.data.vertex_colors[-1]
                     obsumarea[findex] = sum([face.area for face in ob.data.polygons if ob.data.materials[face.material_index].vi_shadow])
                     shadfaces = [face for face in ob.data.polygons if ob.data.materials[face.material_index].vi_shadow]
-                    shadcentres[findex] = [[obm*mathutils.Vector((face.center)) + 0.05*face.normal, obm*mathutils.Vector((face.center)), 1] for face in shadfaces]
-                    for fa, face in enumerate(shadfaces):
+                    for face in shadfaces:
                         for li in face.loop_indices:
-                            vertexColor.data[li].color = (1, 1, 1)
-                        for direc in direcs:
-                            if bpy.data.scenes[0].ray_cast(shadcentres[findex][fa][0], shadcentres[findex][fa][1] + 10000*direc)[0]:
-                                shadcentres[findex][fa][2] -= 1/(len(direcs))
-                        if shadcentres[findex][fa][2] < 1:
-                            for li in face.loop_indices:
-                                vertexColor.data[li].color = [shadcentres[findex][fa][2]]*3
-
-                        obavres[findex] += face.area * 100 * (shadcentres[findex][fa][2])/obsumarea[findex]
-                        obmaxres[findex] = 100* (max([sh[2] for sh in shadcentres[findex]]))
-                        obminres[findex] = 100* (min([sh[2] for sh in shadcentres[findex]]))
+                            vertexColour.data[li].color = (1, 1, 1)
+                    if simnode.cpoint == '0':  
+                        ob['cverts'] = []
+                        shadcentres[findex] = [[obm*mathutils.Vector((face.center)) + 0.05*face.normal, obm*mathutils.Vector((face.center)), 1] for face in shadfaces]                    
+                        for fa, face in enumerate(shadfaces):
+                            for direc in direcs:
+                                if bpy.data.scenes[0].ray_cast(shadcentres[findex][fa][0], shadcentres[findex][fa][1] + 10000*direc)[0]:
+                                    shadcentres[findex][fa][2] -= 1/(len(direcs))
+                            if shadcentres[findex][fa][2] < 1:
+                                for li in face.loop_indices:
+                                    vertexColour.data[li].color = [shadcentres[findex][fa][2]]*3
+                            obavres[findex] += face.area * 100 * (shadcentres[findex][fa][2])/obsumarea[findex]
+                    else:
+                        csfvi = [item for sublist in [face.vertices[:] for face in ob.data.polygons if ob.data.materials[face.material_index].vi_shadow] for item in sublist]
+                        ob['cverts'] = [v for (i,v) in enumerate(csfvi) if v not in csfvi[0:i]]
+                        shadverts = [ob.data.vertices[i] for i in ob['cverts']]
+                        shadcentres[findex] = [[obm*mathutils.Vector((v.co)) + 0.05*v.normal, obm*mathutils.Vector((v.co)), 1] for v in shadverts]
+                        cvtup = tuple(ob['cverts'])
+                        
+                        for vi in range(len(ob['cverts'])):
+                            for direc in direcs:
+                                if bpy.data.scenes[0].ray_cast(shadcentres[findex][vi][0], shadcentres[findex][vi][1] + 10000*direc)[0]:
+                                    shadcentres[findex][vi][2] -= 1/(len(direcs))
+                            
+                            for fa, face in enumerate(shadfaces):
+                                for li in face.loop_indices:
+                                    v = ob.data.loops[li].vertex_index
+                                    if v in cvtup:
+                                        col_i = cvtup.index(v)                                        
+                                        if shadcentres[findex][col_i][2] < 1:
+                                            vertexColour.data[li].color = [shadcentres[findex][col_i][2]]*3
+                        
+                        obavres[findex] = sum([vertarea(ob, ob.data.vertices[vi]) * 100 * (shadcentres[findex][i][2]) for i, vi in enumerate(ob['cverts'])])/obsumarea[findex]
+                    
+                    obmaxres[findex] = 100* (max([sh[2] for sh in shadcentres[findex]]))
+                    obminres[findex] = 100* (min([sh[2] for sh in shadcentres[findex]]))
 
                     scmaxres[findex] = obmaxres[findex] if obmaxres[findex] > scmaxres[findex] else scmaxres[findex]
                     scminres[findex] = obminres[findex] if obminres[findex] < scminres[findex] else scminres[findex]
@@ -1145,8 +1153,6 @@ class NODE_OT_Shadow(bpy.types.Operator):
                 ob['oave'] = {str(f):obavres[f - scene.fs] for f in framerange(scene, simnode.animmenu)}
                 ob['oreslist'] = {str(f):[100*sh[2] for sh in shadcentres[f - scene.fs]] for f in framerange(scene, simnode.animmenu)}
 
-            else:
-               ob.licalc = 0
         vcframe('', scene, obcalclist, simnode.animmenu)
         try:
 #            simnode['maxres'], simnode['minres'], simnode['avres'] = scmaxres, scminres, [scavres[f]/len([ob for ob in scene.objects if ob.licalc]) for f in range(fdiff)]

@@ -8,8 +8,8 @@ def enpolymatexport(exp_op, node, locnode, em, ec):
         scene.update()
     en_epw = open(locnode.weather, "r")
     en_idf = open(scene['viparams']['idf_file'], 'w')
-    node.sdoy = datetime.datetime(datetime.datetime.now().year, locnode.startmonth, 1).timetuple().tm_yday
-    node.edoy = (datetime.date(datetime.datetime.now().year, locnode.endmonth + (1, -11)[locnode.endmonth == 12], 1) - datetime.timedelta(days = 1)).timetuple().tm_yday
+    node.sdoy = datetime.datetime(datetime.datetime.now().year, node.startmonth, 1).timetuple().tm_yday
+    node.edoy = (datetime.date(datetime.datetime.now().year, node.endmonth + (1, -11)[node.endmonth == 12], 1) - datetime.timedelta(days = 1)).timetuple().tm_yday
     enng = [ng for ng in bpy.data.node_groups if 'EnVi Network' in ng.bl_label][0] if [ng for ng in bpy.data.node_groups if 'EnVi Network' in ng.bl_label] else 0
 
     en_idf.write("!- Blender -> EnergyPlus\n!- Using the EnVi export scripts\n!- Author: Ryan Southall\n!- Date: {}\n\nVERSION,8.1.0;\n\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
@@ -27,7 +27,7 @@ def enpolymatexport(exp_op, node, locnode, em, ec):
 
     params = ('Name', 'Begin Month', 'Begin Day', 'End Month', 'End Day', 'Day of Week for Start Day', 'Use Weather File Holidays and Special Days', 'Use Weather File Daylight Saving Period',\
     'Apply Weekend Holiday Rule', 'Use Weather File Rain Indicators', 'Use Weather File Snow Indicators', 'Number of Times Runperiod to be Repeated')
-    paramvs = (node.loc, locnode.startmonth, '1', locnode.endmonth, ((datetime.date(datetime.datetime.now().year, locnode.endmonth + (1, -11)[locnode.endmonth == 12], 1) - datetime.timedelta(days = 1)).day), "UseWeatherFile", "Yes", "Yes", "No", "Yes", "Yes", "1")
+    paramvs = (node.loc, node.startmonth, '1', node.endmonth, ((datetime.date(datetime.datetime.now().year, node.endmonth + (1, -11)[node.endmonth == 12], 1) - datetime.timedelta(days = 1)).day), "UseWeatherFile", "Yes", "Yes", "No", "Yes", "Yes", "1")
     en_idf.write(epentry('RunPeriod', params, paramvs))
 
 #    en_idf.write("Site:Location,\n")
@@ -79,7 +79,7 @@ def enpolymatexport(exp_op, node, locnode, em, ec):
                 elif presetmat in em.gas_dat:
                     em.amat_write(en_idf, matname[-1], [em.matdat[presetmat][2]])
                 elif mat.envi_con_type =='Window' and em.matdat[presetmat][0] == 'Glazing':
-                    em.tmat_write(en_idf, matname[-1], list(em.matdat[presetmat]), str(thicklist[pm]/1000))
+                    em.tmat_write(en_idf, matname[-1], list(em.matdat[presetmat]) + [0], str(thicklist[pm]/1000))
                 elif mat.envi_con_type =='Window' and em.matdat[presetmat][0] == 'Gas':
                     em.gmat_write(en_idf, matname[-1], list(em.matdat[presetmat]), str(thicklist[pm]/1000))
 
@@ -105,7 +105,7 @@ def enpolymatexport(exp_op, node, locnode, em, ec):
                 elif layer == "1" and mat.envi_con_type == "Window":
                     mats = ((mat.envi_export_glasslist_lo, mat.envi_export_wgaslist_l1, mat.envi_export_glasslist_l2, mat.envi_export_wgaslist_l3, mat.envi_export_glasslist_l4)[l])
                     if l in (0, 2, 4):
-                        em.tmat_write(en_idf, '{}-{}'.format(mats, matcount.count(mats)), list(em.matdat[mats]) + [(mat.envi_export_lo_sdiff, '', mat.envi_export_l2_sdiff, '', mat.envi_export_l2_sdiff)[l]], str(thicklist[l]/1000))
+                        em.tmat_write(en_idf, '{}-{}'.format(mats, matcount.count(mats)), list(em.matdat[mats]) + [(mat.envi_export_lo_sdiff, '', mat.envi_export_l2_sdiff, '', mat.envi_export_l4_sdiff)[l]], str(thicklist[l]/1000))
                     else:
                         em.gmat_write(en_idf, '{}-{}'.format(mats, matcount.count(mats)), list(em.matdat[mats]), str(thicklist[l]/1000))
 
@@ -268,8 +268,9 @@ def enpolymatexport(exp_op, node, locnode, em, ec):
             en_idf.write(hcoiobj.zi())
 
     en_idf.write("\n!-   ===========  ALL OBJECTS IN CLASS: AIRFLOW NETWORK ===========\n\n")
-
-    writeafn(exp_op, en_idf, enng)
+    
+    if enng:
+        writeafn(exp_op, en_idf, enng)
 
     en_idf.write("!-   ===========  ALL OBJECTS IN CLASS: REPORT VARIABLE ===========\n\n")
     epentrydict = {"Output:Variable,*,Site Outdoor Air Drybulb Temperature,Hourly;\n": node.resat, "Output:Variable,*,Site Wind Speed,Hourly;\n": node.resaws,
