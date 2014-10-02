@@ -899,8 +899,8 @@ class NODE_OT_SunPath(bpy.types.Operator):
         for ob in (spathob, sunob):
             spathob.cycles_visibility.diffuse, spathob.cycles_visibility.shadow, spathob.cycles_visibility.glossy, spathob.cycles_visibility.transmission = [False] * 4
 
-        if cyfc1 not in bpy.app.handlers.frame_change_pre:
-            bpy.app.handlers.frame_change_pre.append(cyfc1)
+        if cyfc1 not in bpy.app.handlers.frame_change_post:
+            bpy.app.handlers.frame_change_post.append(cyfc1)
         bpy.ops.view3d.spnumdisplay('INVOKE_DEFAULT')
         return {'FINISHED'}
 
