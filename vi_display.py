@@ -140,12 +140,27 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
          or (bpy.context.active_object not in (obcalclist+obreslist) and scene.vi_display_sel_only == True)  \
          or (bpy.context.active_object and bpy.context.active_object.mode == 'EDIT'):
         return
+<<<<<<< local
+    
+    if not context.space_data.region_3d.is_perspective:
+        disp_op.report({'ERROR'},"Switch to prespective view mode for number display")
+        return
+    if scene.frame_current not in range(scene.fs, scene.fe + 1) and scene.vi_display:
+        disp_op.report({'ERROR'},"Outside result frame range")
+        return
+    
+    if bpy.context.active_object:
+        if bpy.context.active_object.type == 'MESH' and bpy.context.active_object.mode != 'OBJECT':
+             bpy.context.active_object.mode = 'OBJECT'
+    
+=======
     
     if scene.frame_current not in range(scene.fs, scene.fe + 1) and scene.vi_display:
         disp_op.report({'INFO'},"Outside result frame range")
         return
     
     vi_func.objmode()    
+>>>>>>> other
     blf.enable(0, 4)
     blf.shadow(0, 5, scene.vi_display_rp_fsh[0], scene.vi_display_rp_fsh[1], scene.vi_display_rp_fsh[2], scene.vi_display_rp_fsh[3])
     bgl.glColor4f(*scene.vi_display_rp_fc[:])
@@ -177,6 +192,11 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
             ob.active_shape_key_index = [sk.name for sk in ob.data.shape_keys.key_blocks].index(str(fn))
 
         obm = ob.data
+<<<<<<< local
+        ob_mat = ob.matrix_world
+        view_mat = context.space_data.region_3d.perspective_matrix
+        view_pos = [vmi*scene['cs'] * 2 for vmi in (view_mat.inverted()[0][3], view_mat.inverted()[1][3], view_mat.inverted()[2][3])]
+=======
         omw = ob.matrix_world
         total_mat = view_mat * omw
         faces = [f for f in ob.data.polygons if f.select and not f.hide and (vi_func.face_centre(ob, ob.lires, f) - view_location)*vw < 0]  if ob.lires else [ob.data.polygons[fi] for fi in ob['cfaces'] if not ob.data.polygons[fi].hide and ((omw * ob.data.polygons[fi].center) - view_location)*vw < 0]
@@ -187,7 +207,14 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
                 
             fcs = [total_mat*vi_func.face_centre(ob, ob.lires, face).to_4d() for face in faces]
             li = [face.loop_indices[0] for face in faces]
+>>>>>>> other
 
+<<<<<<< local
+        if cp == "0" or not geonode:
+            faces = [f for f in ob.data.polygons if f.select == True] if ob.lires else [f for f in ob.data.polygons if ob.data.materials[f.material_index].vi_shadow] if simnode.bl_label == 'VI Shadow Study' else [f for f in ob.data.polygons if f.select == True] if ob.lires else [f for f in ob.data.polygons if ob.data.materials[f.material_index].livi_sense]
+            if scene.vi_display_vis_only:
+                faces = [f for f in faces if not scene.ray_cast(ob_mat*((vi_func.face_centre(ob, len(obreslist), f)))+ 0.01*(ob_mat*f.normal-ob.location), view_pos)[0]]
+=======
             if geonode:
                 vals = [abs(min(simnode['minres']) + (1 - (1.333333*colorsys.rgb_to_hsv(*[obm.vertex_colors[fn].data[li[f]].color[i]/255 for i in range(3)])[0]))*(maxval - minval)) for f in range(len(fcs))]
                 for f in range(len(fcs)):
@@ -196,6 +223,7 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
                 vals = [obm.vertex_colors[fn].data[li[f]].color for f in range(len(fcs))]
                 for f in range(len(fcs)):
                     vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, '{:.0f}'.format(abs(vals[f][0]*100)), fcs[f])
+>>>>>>> other
         else:
             fverts = set(sum([list(f.vertices[:]) for f in faces if f.select], [])) if ob.lires else ob['cverts']
             verts = [ob.data.vertices[v] for v in fverts if not scene.ray_cast(omw*(vi_func.v_pos(ob, v) + 0.01 * ob.data.vertices[v].normal), view_location)[0]] if scene.vi_display_vis_only else [ob.data.vertices[v] for v in fverts]
@@ -210,6 +238,33 @@ def linumdisplay(disp_op, context, simnode, connode, geonode):
                         else:
                             vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, ('{:.1f}', '{:.0f}')[maxval > 100].format(abs(minval + (obm.vertex_colors[fn].data[loop].color[0])*(maxval - minval))), total_mat*vpos.to_4d())
                         break
+<<<<<<< local
+
+        total_mat = view_mat*ob_mat
+        if cp == "0" or not geonode:            
+            for f in faces:
+                vsum = mathutils.Vector((0, 0, 0))
+                for v in f.vertices:
+                    vsum = ob.active_shape_key.data[v].co + vsum if len(obreslist) > 0 else ob.data.vertices[v].co + vsum
+                fc = vsum/len(f.vertices)
+                if not f.hide:
+                    loop_index = f.loop_indices[0]
+                    if len(set(obm.vertex_colors[fn].data[loop_index].color[:])) > 0:
+                        if (total_mat*fc)[2] > 0:
+                            col, maxval, minval = obm.vertex_colors[fn].data[loop_index].color, max(simnode['maxres']), min(simnode['minres'])
+                            if geonode:
+                                val = abs(min(simnode['minres']) + (1 - (1.333333*colorsys.rgb_to_hsv(*[col[i]/255 for i in range(3)])[0]))*(maxval - minval))
+                                vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, ('{:.1f}', '{:.0f}')[val > 100].format(val), total_mat*fc.to_4d())
+                            else:
+                                vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, '{:.0f}'.format(abs(col[0]*100)), total_mat*fc.to_4d())
+        elif cp == "1":
+            for v, vert in enumerate(verts):
+                vpos = ob.active_shape_key.data[vert.index].co if len(obreslist) > 0 else vert.co
+                if len(set(obm.vertex_colors[fn].data[vert.index].color[:])) > 0:
+                    if (total_mat*vpos)[2] > 0:
+                        vi_func.draw_index(context, scene.vi_leg_display, mid_x, mid_y, width, height, ('{:.1f}', '{:.0f}')[max(simnode['maxres']) > 100].format(abs(min(simnode['minres']) + int((1 - (1.333333*colorsys.rgb_to_hsv(obm.vertex_colors[fn].data[loops[v]].color[0]/255, obm.vertex_colors[fn].data[loops[v]].color[1]/255, obm.vertex_colors[fn].data[loops[v]].color[2]/255)[0]))*(max(simnode['maxres']) - min(simnode['minres']))))), total_mat*vpos.to_4d())
+=======
+>>>>>>> other
     blf.disable(0, 4)
 
 def li3D_legend(self, context, simnode, connode, geonode):
@@ -305,12 +360,32 @@ def viwr_legend(self, context, simnode):
             font_id = 0
             bgl.glColor4f(0.0, 0.0, 0.0, 0.8)
             blf.size(font_id, 20, 48)
+<<<<<<< local
+            bgl.glColor4f(0.0, 0.0, 0.0, 1.0)
+            blf.position(font_id, 65, height - 65 - (simnode['nbins'] * 20) + (i*20), 0)
+            blf.draw(font_id, "  "*(lenres - len(resvals[i]) ) + resvals[i])
+
+        blf.size(font_id, 20, 56)
+        cu = 'Speed (m/s)'
+        vi_func.drawfont(cu, font_id, 0, height, 25, 57)
+        bgl.glLineWidth(1)
+        bgl.glDisable(bgl.GL_BLEND)
+        height = context.region.height
+        font_id = 0
+        bgl.glColor4f(0.0, 0.0, 0.0, 0.8)
+        blf.size(font_id, 20, 48)
+        vi_func.drawfont("Ave: {:.1f}".format(simnode['avres']), font_id, 0, height, 22, simnode['nbins']*20 + 85)
+        vi_func.drawfont("Max: {:.1f}".format(simnode['maxres']), font_id, 0, height, 22, simnode['nbins']*20 + 100)
+        vi_func.drawfont("Min: {:.1f}".format(simnode['minres']), font_id, 0, height, 22, simnode['nbins']*20 + 115)
+
+=======
             vi_func.drawfont("Ave: {:.1f}".format(simnode['avres']), font_id, 0, height, 22, simnode['nbins']*20 + 85)
             vi_func.drawfont("Max: {:.1f}".format(simnode['maxres']), font_id, 0, height, 22, simnode['nbins']*20 + 100)
             vi_func.drawfont("Min: {:.1f}".format(simnode['minres']), font_id, 0, height, 22, simnode['nbins']*20 + 115)
         except:
             scene.vi_display = 0
             
+>>>>>>> other
 def li_compliance(self, context, connode):
     height, scene = context.region.height, context.scene
     if not scene.get('li_compliance') or scene.frame_current not in range(scene.fs, scene.fe + 1) or scene.vi_display == 0:
@@ -380,14 +455,22 @@ def li_compliance(self, context, connode):
             vi_func.drawloop(100, height - 70, 900, height - 70  - (lencrit)*25)
             mat = [m for m in bpy.context.active_object.data.materials if m.livi_sense][0]
             if connode.analysismenu == '0':
+<<<<<<< local
+                buildspace = ('', '', (' - Public/Staff', ' - Patient')[int(mat.hspacemenu)], (' - Kitchen', ' - Living/Dining/Study', ' - Communal')[int(mat.rspacemenu)], (' - Sales', ' - Office')[int(mat.respacemenu)], '')[int(connode.bambuildmenu)]
+=======
                 buildspace = ('', '', (' - Public/Staff', ' - Patient')[int(mat.hspacemenu)], (' - Kitchen', ' - Living/Dining/Study', ' - Communal')[int(mat.brspacemenu)], (' - Sales', ' - Office')[int(mat.respacemenu)], '')[int(connode.bambuildmenu)]
+>>>>>>> other
             elif connode.analysismenu == '1':
                 buildspace = (' - Kitchen', ' - Living/Dining/Study')[int(mat.crspacemenu)]
 
             titles = ('Zone Metric', 'Target', 'Achieved', 'PASS/FAIL')
             tables = [[] for c in range(lencrit -1)]
             etables = [[] for e in range(len(geo['ecrit']))]
+<<<<<<< local
+
+=======
             
+>>>>>>> other
             for c, cr in enumerate(geo['crit']):
                 if cr[0] == 'Percent':
                     if cr[2] == 'Skyview':

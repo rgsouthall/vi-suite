@@ -86,6 +86,36 @@ def radmat(self, scene):
     self['radentry'] = radentry
     return(radentry)
 
+<<<<<<< local
+def radmat(mat, scene):
+    matname = mat.name.replace(" ", "_")
+    if scene.render.engine == 'CYCLES' and hasattr(mat.node_tree, 'nodes'):
+        cycmattypes = ('Diffuse BSDF', 'Glass BSDF', 'Glossy BSDF', 'Translucent BSDF', 'Ambient Occlusion', 'Emission', 'Transparent BSDF')
+        if mat.node_tree.nodes['Material Output'].inputs['Surface'].is_linked:
+            try:
+                matnode = mat.node_tree.nodes['Material Output'].inputs['Surface'].links[0].from_node
+                matindex = cycmattypes.index(matnode.bl_label) if matnode.bl_label in cycmattypes else 0
+                matcol, matior, matrough, matemit  = matnode.inputs[0].default_value, matnode.inputs[2].default_value if matindex == 1 else 1.52, \
+                    matnode.inputs[1].default_value if matindex == 0 else 0,  matnode.inputs[1].default_value if matindex == 5 else 0
+                radname = ('plastic', 'glass', 'mirror', 'trans', 'antimatter', 'light', 'glass')[matindex]
+                radnums = ('5 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1} {2:.2f}'.format(matcol, '0', matrough),\
+                '4 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1:.3f}'.format(matcol, matior), \
+                '3 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f}'.format(matcol), \
+                '7 {0[0]:.3f} {0[1]:.3f} {0[2]:.3f}\n\n'.format(matcol), \
+                '', \
+                '3 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f}\n'.format([c * matemit for c in matcol]), \
+                '4 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1:.3f}'.format(matcol, matior))[matindex]
+            except:
+                radname, radnums = 'plastic', '5 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1} {2:.2f}'.format((0.8, 0.8, 0.8), 0, 0)
+        else:
+            radname, radnums = 'plastic', '5 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1} {2:.2f}'.format((0.8, 0.8, 0.8), 0, 0)
+            
+    elif scene.render.engine == 'BLENDER_RENDER':
+        matcol = [i * mat.diffuse_intensity for i in mat.diffuse_color]
+        matior = mat.raytrace_transparency.ior
+        matrough = 1.0-mat.specular_hardness/511.0
+        matemit = mat.emit
+=======
 def viparams(scene):
     fd, fn = os.path.dirname(bpy.data.filepath), os.path.splitext(os.path.basename(bpy.data.filepath))[0]
 
@@ -98,7 +128,35 @@ def viparams(scene):
     scene['viparams'] = {'rm': ('rm ', 'del ')[str(sys.platform) == 'win32'], 'cat': ('cat ', 'type ')[str(sys.platform) == 'win32'],
     'cp': ('cp ', 'copy ')[str(sys.platform) == 'win32'], 'nproc': str(multiprocessing.cpu_count()), 'filepath': bpy.data.filepath,
     'filename': fn, 'filedir': fd, 'newdir': nd, 'objfilebase': ofb, 'idf_file': idf, 'filebase': fb}
+>>>>>>> other
 
+<<<<<<< local
+        if mat.use_shadeless == 1 or mat.livi_compliance:
+            radname, radnums = 'antimatter', ''
+
+        elif mat.emit > 0:
+            radname, radnums = 'light', '3 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f}\n'.format([c * matemit for c in matcol])
+
+        elif mat.use_transparency == False and mat.raytrace_mirror.use == True and mat.raytrace_mirror.reflect_factor >= 0.99:
+            radname, radnums = 'mirror', '3 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f}'.format(mat.mirror_color)
+
+        elif mat.use_transparency == True and mat.transparency_method == 'RAYTRACE' and mat.alpha < 1.0 and mat.translucency == 0:
+            radname = 'glass'
+            if "{:.2f}".format(mat.raytrace_transparency.ior) == "1.52":
+                radnums = '3 {0[0]:.3f} {0[1]:.3f} {0[2]:.3f}'.format([c * (1.0 - mat.alpha) for c in matcol])
+            else:
+                radnums = '4 {0[0]:.3f} {0[1]:.3f} {0[2]:.3f} {1:.3f}'.format([c * (1.0 - mat.alpha) for c in matcol], matior)
+        elif mat.use_transparency == True and mat.transparency_method == 'RAYTRACE' and mat.alpha < 1.0 and mat.translucency > 0.001:
+            radname, radnums  = 'trans', '7 {0[0]:.3f} {0[1]:.3f} {0[2]:.3f} {1} {2} {3} {4}'.format(matcol, mat.specular_intensity, 1.0 - mat.specular_hardness/511.0, 1.0 - mat.alpha, 1.0 - mat.translucency)
+        elif mat.use_transparency == False and mat.raytrace_mirror.use == True and mat.raytrace_mirror.reflect_factor < 0.99:
+            radname, radnums  = 'metal', '5 {0[0]:.3f} {0[1]:.3f} {0[2]:.3f} {1} {2}'.format(matcol, mat.specular_intensity, 1.0-mat.specular_hardness/511.0)
+        else:
+            radname, radnums  = 'plastic', '5 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1:.2f} {2:.2f}'.format(matcol, mat.specular_intensity, 1.0-mat.specular_hardness/511.0)
+    else:
+        radname, radnums = 'plastic', '5 {0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {1} {2:.2f}'.format((0.8, 0.8, 0.8), 0, 0)
+    
+    return(radname, matname, radnums)
+=======
 def nodestate(self, opstate):
     if self['exportstate'] !=  opstate:
         self.exported = False
@@ -108,6 +166,7 @@ def nodestate(self, opstate):
         self.exported = True
         if self.bl_label[0] == '*':
             self.bl_label = self.bl_label[1:-1]
+>>>>>>> other
 
 def face_centre(ob, obresnum, f):
     if obresnum:
@@ -144,6 +203,30 @@ def retmesh(name, fr, node, scene):
     if node.animmenu in ("Geometry", "Material"):
         return(scene['viparams']['objfilebase']+"-{}-{}.mesh".format(name.replace(" ", "_"), fr))
     else:
+<<<<<<< local
+        return(node.objfilebase+"-{}-{}.mesh".format(name.replace(" ", "_"), bpy.context.scene.frame_start))
+        
+def nodeinputs(node):
+    try:
+        ins = [i for i in node.inputs if not i.hide]
+        if ins and not all([i.is_linked for i in ins]):
+            return 0
+        elif ins and not all([i.links[0].from_node.exported for i in ins if i.is_linked]):
+            return 0
+        else:
+            inodes = [i.links[0].from_node for i in ins if i.links[0].from_node.inputs]
+            for inode in inodes:
+                iins = [i for i in inode.inputs if not i.hide]
+                if iins and not all([i.is_linked for i in iins]):
+                    return 0
+                elif iins and not all([i.links[0].from_node.exported for i in iins if i.is_linked]):
+                    return 0
+        return 1
+    except:
+        pass
+    
+def retmat(fr, node):
+=======
         return(scene['viparams']['objfilebase']+"-{}-{}.mesh".format(name.replace(" ", "_"), bpy.context.scene.frame_start))
 
 def nodeinputs(node):
@@ -166,6 +249,7 @@ def nodeinputs(node):
         pass
 
 def retmat(fr, node, scene):
+>>>>>>> other
     if node.animmenu == "Material":
         return("{}-{}.rad".format(scene['viparams']['filebase'], fr))
     else:
@@ -191,8 +275,13 @@ def clearscene(scene, op):
                 scene.objects.active = ob
                 while ob.data.vertex_colors:
                     bpy.ops.mesh.vertex_color_remove()
+<<<<<<< local
+        
+        if op.nodeid.split('@')[0] not in ('LiVi Simulation', 'LiVi Geometry'):   
+=======
 
         if op.nodeid.split('@')[0] not in ('LiVi Simulation', 'LiVi Geometry'):
+>>>>>>> other
             for sunob in [ob for ob in scene.objects if ob.type == 'LAMP' and ob.data.type == 'SUN']:
                 scene.objects.unlink(sunob)
 
@@ -462,6 +551,18 @@ def rettimes(ts, fs, us):
                 ustrings[t][uf].append(['Until: '+','.join([u for u in utime.split(' ') if u.strip(' ')])])
     return(tstrings, fstrings, ustrings)
 
+<<<<<<< local
+def socklink(sock, ng):
+    try:
+        for link in sock.links:
+            lsock = (link.from_socket, link.to_socket)[sock.is_output]
+            if sock.is_linked and sock.draw_color(bpy.context, sock.node) != lsock.draw_color(bpy.context, lsock.node):
+                bpy.data.node_groups[ng].links.remove(link)
+    except:
+        pass
+
+=======
+>>>>>>> other
 def windcompass():
     rad1 = 1.4
     dep = 2.8
@@ -546,6 +647,20 @@ def drawfont(text, fi, lencrit, height, x1, y1):
     blf.position(fi, x1, height - y1 - lencrit*26, 0)
     blf.draw(fi, text)
 
+<<<<<<< local
+def mtx2vals(mtxlines, fwd, locnode):
+    if locnode:
+        records = (datetime.datetime(datetime.datetime.now().year, locnode.endmonth, 1) - datetime.datetime(datetime.datetime.now().year, locnode.startmonth, 1)).days*24
+    else:
+        for records, line in enumerate(mtxlines):
+            if line == '\n':
+                break
+    try:
+        import numpy
+        np = 1
+    except:
+        np = 0
+=======
 def mtx2vals(mtxlines, fwd, node):
     for m, mtxline in enumerate(mtxlines):
         if 'NROWS' in mtxline:
@@ -555,6 +670,7 @@ def mtx2vals(mtxlines, fwd, node):
         elif mtxline == '\n':
             startline = m + 1
             break
+>>>>>>> other
 
     vecvals, vals, hour, patch = numpy.array([[x%24, (fwd+int(x/24))%7] + [0 for p in range(patches)] for x in range(hours)]), numpy.zeros((patches)), 0, 2
     
@@ -674,6 +790,17 @@ def sunpath():
         sun['solhour'], sun['solday'], sun['soldistance'] = scene.solhour, scene.solday, scene.soldistance
     else:
         return
+<<<<<<< local
+        
+def epwlatilongi(scene, node):        
+    with open(node.weather, "r") as epwfile:
+        fl = epwfile.readline()
+        latitude, longitude = float(fl.split(",")[6]), float(fl.split(",")[7])
+#    else:
+#        latitude, longitude = node.latitude, node.longitude
+    return latitude, longitude  
+    
+=======
 
 def epwlatilongi(scene, node):
     with open(node.weather, "r") as epwfile:
@@ -683,6 +810,7 @@ def epwlatilongi(scene, node):
 #        latitude, longitude = node.latitude, node.longitude
     return latitude, longitude
 
+>>>>>>> other
 #Compute solar position (altitude and azimuth in degrees) based on day of year (doy; integer), local solar time (lst; decimal hours), latitude (lat; decimal degrees), and longitude (lon; decimal degrees).
 def solarPosition(doy, lst, lat, lon):
     #Set the local standard time meridian (lsm) (integer degrees of arc)

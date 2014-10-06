@@ -59,6 +59,30 @@ def matfunc(i):
                    '5': envi_mats.glass_dat.keys(), '6': envi_mats.concrete_dat.keys(), '7': envi_mats.insulation_dat.keys(), '8': envi_mats.wgas_dat.keys(), '9': envi_mats.cladding_dat.keys()}
     return [((mat, mat, 'Contruction type')) for mat in list(matfuncdict[str(i)])]
 
+<<<<<<< local
+def matfunc(i):
+    if i == 0:
+        return [((brick, brick, 'Contruction type')) for brick in list(envi_mats.brick_dat.keys())]
+    elif i == 1:
+        return [((stone, stone, 'Contruction type')) for stone in list(envi_mats.stone_dat.keys())]
+    elif i == 2:
+        return [((metal, metal, 'Contruction type')) for metal in list(envi_mats.metal_dat.keys())]
+    elif i == 3:
+        return [((wood, wood, 'Contruction type')) for wood in list(envi_mats.wood_dat.keys())]
+    elif i == 4:
+        return [((gas, gas, 'Contruction type')) for gas in list(envi_mats.gas_dat.keys())]
+    elif i == 5:
+        return [((glass, glass, 'Contruction type')) for glass in list(envi_mats.glass_dat.keys())]
+    elif i == 6:
+        return [((concrete, concrete, 'Contruction type')) for concrete in list(envi_mats.concrete_dat.keys())]
+    elif i == 7:
+        return [((insulation, insulation, 'Contruction type')) for insulation in list(envi_mats.insulation_dat.keys())]
+    elif i == 8:
+        return [((wgas, wgas, 'Contruction type')) for wgas in list(envi_mats.wgas_dat.keys())]
+    elif i == 9:
+        return [((cladding, cladding, 'Contruction type')) for cladding in list(envi_mats.cladding_dat.keys())]
+=======
+>>>>>>> other
 def confunc(i):
     confuncdict = {'0': envi_cons.wall_con.keys(), '1': envi_cons.floor_con.keys(), '2': envi_cons.roof_con.keys(), 
     '3': envi_cons.door_con.keys(), '4': envi_cons.glaze_con.keys()}
@@ -221,6 +245,69 @@ def register():
     Material.envi_export_roofconlist = eprop(roofconlist, "Roof Constructions",  "", roofconlist[0][0])
     Material.envi_export_doorconlist = eprop(doorconlist, "Door Constructions",  "", doorconlist[0][0])
     Material.envi_export_glazeconlist = eprop(glazeconlist, "Window Constructions",  "", glazeconlist[0][0])
+<<<<<<< local
+    Material.envi_export_bricklist_lo = eprop(bricklist, "", "", bricklist[0][0])
+    Material.envi_export_claddinglist_lo = eprop(claddinglist, "", "", claddinglist[0][0])
+    Material.envi_export_stonelist_lo = eprop(stonelist, "",  "", stonelist[0][0])
+    Material.envi_export_woodlist_lo = eprop(woodlist, "",  "", woodlist[0][0])
+    Material.envi_export_metallist_lo = eprop(metallist, "",  "", metallist[0][0])
+    Material.envi_export_gaslist_lo = eprop(gaslist, "",  "", gaslist[0][0])
+    Material.envi_export_glasslist_lo = eprop(glasslist, "",  "", glasslist[0][0])
+    Material.envi_export_concretelist_lo = eprop(concretelist, "",  "", concretelist[0][0])
+    Material.envi_export_insulationlist_lo = eprop(insullist, "",  "", insullist[0][0])
+    Material.envi_export_wgaslist_lo = eprop(wgaslist, "",  "", wgaslist[0][0])
+    Material.envi_export_bricklist_l1 = eprop(bricklist, "",  "", bricklist[0][0])
+    Material.envi_export_claddinglist_l1 = eprop(claddinglist, "", "", claddinglist[0][0])
+    Material.envi_export_stonelist_l1 = eprop(stonelist, "",  "", stonelist[0][0])
+    Material.envi_export_woodlist_l1 = eprop(woodlist, "",  "", woodlist[0][0])
+    Material.envi_export_metallist_l1 = eprop(metallist, "",  "", metallist[0][0])
+    Material.envi_export_gaslist_l1 = eprop(gaslist, "",  "", gaslist[0][0])
+    Material.envi_export_glasslist_l1 = eprop(glasslist, "",  "", glasslist[0][0])
+    Material.envi_export_concretelist_l1 = eprop(concretelist, "",  "", concretelist[0][0])
+    Material.envi_export_insulationlist_l1 = eprop(insullist, "",  "", insullist[0][0])
+    Material.envi_export_wgaslist_l1 = eprop(wgaslist, "",  "", wgaslist[0][0])
+    Material.envi_export_bricklist_l2 = eprop(bricklist, "",  "", bricklist[0][0])
+    Material.envi_export_claddinglist_l2 = eprop(claddinglist, "", "", claddinglist[0][0])
+    Material.envi_export_stonelist_l2 = eprop(stonelist, "",  "", stonelist[0][0])
+    Material.envi_export_woodlist_l2 = eprop(woodlist, "",  "", woodlist[0][0])
+    Material.envi_export_metallist_l2 = eprop(metallist, "",  "", metallist[0][0])
+    Material.envi_export_gaslist_l2 = eprop(gaslist, "",  "", gaslist[0][0])
+    Material.envi_export_glasslist_l2 = eprop(glasslist, "",  "", glasslist[0][0])
+    Material.envi_export_concretelist_l2 = eprop(concretelist, "",  "", concretelist[0][0])
+    Material.envi_export_insulationlist_l2 = eprop(insullist, "",  "", insullist[0][0])
+    Material.envi_export_wgaslist_l2 = eprop(wgaslist, "",  "", wgaslist[0][0])
+    Material.envi_export_bricklist_l3 = eprop(bricklist, "",  "", bricklist[0][0])
+    Material.envi_export_claddinglist_l3 = eprop(claddinglist, "", "", claddinglist[0][0])
+    Material.envi_export_stonelist_l3 = eprop(stonelist, "",  "", stonelist[0][0])
+    Material.envi_export_woodlist_l3 = eprop(woodlist, "",  "", woodlist[0][0])
+    Material.envi_export_metallist_l3 = eprop(metallist, "",  "", metallist[0][0])
+    Material.envi_export_gaslist_l3 = eprop(gaslist, "",  "", gaslist[0][0])
+    Material.envi_export_glasslist_l3 = eprop(glasslist, "",  "", glasslist[0][0])
+    Material.envi_export_concretelist_l3 = eprop(concretelist, "",  "", concretelist[0][0])
+    Material.envi_export_insulationlist_l3 = eprop(insullist, "",  "", insullist[0][0])
+    Material.envi_export_wgaslist_l3 = eprop(wgaslist, "",  "", wgaslist[0][0])
+    Material.envi_export_bricklist_l4 = eprop(bricklist, "",  "", bricklist[0][0])
+    Material.envi_export_claddinglist_l4 = eprop(claddinglist, "", "", claddinglist[0][0])
+    Material.envi_export_stonelist_l4 = eprop(stonelist, "",  "", stonelist[0][0])
+    Material.envi_export_woodlist_l4 = eprop(woodlist, "",  "", woodlist[0][0])
+    Material.envi_export_metallist_l4 = eprop(metallist, "",  "", metallist[0][0])
+    Material.envi_export_gaslist_l4 = eprop(gaslist, "",  "", gaslist[0][0])
+    Material.envi_export_glasslist_l4 = eprop(glasslist, "",  "", glasslist[0][0])
+    Material.envi_export_concretelist_l4 = eprop(concretelist, "",  "", concretelist[0][0])
+    Material.envi_export_insulationlist_l4 = eprop(insullist, "",  "", insullist[0][0])
+    Material.envi_export_wgaslist_l4 = eprop(wgaslist, "",  "", wgaslist[0][0])
+    Material.envi_export_lo_name = sprop("Layer name", "Layer name", 0, "")
+    Material.envi_export_l1_name = sprop("Layer name", "Layer name", 0, "")
+    Material.envi_export_l2_name = sprop("Layer name", "Layer name", 0, "")
+    Material.envi_export_l3_name = sprop("Layer name", "Layer name", 0, "")
+    Material.envi_export_l4_name = sprop("Layer name", "Layer name", 0, "")
+    Material.envi_export_lo_tc = fprop("Conductivity", "Thermal Conductivity", 0, 10, 0.5)
+    Material.envi_export_l1_tc = fprop("Conductivity", "Thermal Conductivity", 0, 10, 0.5)
+    Material.envi_export_l2_tc = fprop("Conductivity", "Thermal Conductivity", 0, 10, 0.5)
+    Material.envi_export_l3_tc = fprop("Conductivity", "Thermal Conductivity", 0, 10, 0.5)
+    Material.envi_export_l4_tc = fprop("Conductivity", "Thermal Conductivity", 0, 10, 0.5)
+    Material.envi_export_lo_rough = eprop([("VeryRough", "VeryRough", "Roughness"), ("Rough", "Rough", "Roughness"), ("MediumRough", "MediumRough", "Roughness"),
+=======
     (Material.envi_export_bricklist_lo, Material.envi_export_bricklist_l1, Material.envi_export_bricklist_l2, Material.envi_export_bricklist_l3, Material.envi_export_bricklist_l4) = \
     [eprop(bricklist, "", "", bricklist[0][0])] * conlayers
     (Material.envi_export_claddinglist_lo, Material.envi_export_claddinglist_l1, Material.envi_export_claddinglist_l2, Material.envi_export_claddinglist_l3, Material.envi_export_claddinglist_l4) = \
@@ -247,6 +334,7 @@ def register():
     [fprop("Conductivity", "Thermal Conductivity", 0, 10, 0.5)] * conlayers
     (Material.envi_export_lo_rough, Material.envi_export_l1_rough, Material.envi_export_l2_rough, Material.envi_export_l3_rough, Material.envi_export_l1_rough) = \
     [eprop([("VeryRough", "VeryRough", "Roughness"), ("Rough", "Rough", "Roughness"), ("MediumRough", "MediumRough", "Roughness"),
+>>>>>>> other
                                                         ("MediumSmooth", "MediumSmooth", "Roughness"), ("Smooth", "Smooth", "Roughness"), ("VerySmooth", "VerySmooth", "Roughness")],
                                                         "Material surface roughness", "specify the material rughness for convection calculations", "Rough")] * conlayers
 
@@ -295,16 +383,33 @@ def register():
     Scene.solday = bpy.props.IntProperty(name = "", description = "Day of year", min = 1, max = 365, default = 1, update=sunpath1)
     Scene.solhour = bpy.props.FloatProperty(name = "", description = "Time of day", min = 0, max = 24, default = 12, update=sunpath1)
     Scene.soldistance = bpy.props.IntProperty(name = "", description = "Sun path scale", min = 1, max = 5000, default = 100, update=sunpath1)
+<<<<<<< local
+    Scene.hourdisp = bprop("", "",0)
+    Scene.spupdate = bprop("", "",0)
+#    Scene.latitude = bpy.props.FloatProperty(name="Latitude", description="Site Latitude", min=-90, max=90, default=52)
+#    Scene.longitude = bpy.props.FloatProperty(name="Longitude", description="Site Longitude", min=-180, max=180, default=0)
+=======
     (Scene.hourdisp, Scene.spupdate) = [bprop("", "",0)] * 2
 #    Scene.latitude = bpy.props.FloatProperty(name="Latitude", description="Site Latitude", min=-90, max=90, default=52)
 #    Scene.longitude = bpy.props.FloatProperty(name="Longitude", description="Site Longitude", min=-180, max=180, default=0)
+>>>>>>> other
     Scene.li_disp_panel = iprop("Display Panel", "Shows the Display Panel", -1, 2, 0)
     Scene.li_disp_count = iprop("", "", 0, 1000, 0)
     Scene.vi_disp_3d = bprop("VI 3D display", "Boolean for 3D results display",  False)
     Scene.vi_disp_3dlevel = bpy.props.FloatProperty(name = "", description = "Level of 3D result plane extrusion", min = 0, max = 500, default = 0, update = eupdate)
     Scene.ss_disp_panel = iprop("Display Panel", "Shows the Display Panel", -1, 2, 0)
+<<<<<<< local
+    Scene.ss_leg_display = bprop("", "",False)
+    Scene.en_disp_panel = bprop("", "",False)
+    Scene.li_compliance = bprop("", "", False)
+    Scene.vi_display_rp = bprop("", "", False)
+    Scene.vi_leg_display = bprop("", "", False)
+    Scene.vi_display_sel_only = bprop("", "", False)
+    Scene.vi_display_vis_only = bprop("", "", False)
+=======
     (Scene.lic_disp_panel, Scene.vi_display, Scene.sp_disp_panel, Scene.wr_disp_panel, Scene.ss_leg_display, Scene.en_disp_panel, Scene.li_compliance, Scene.vi_display_rp, Scene.vi_leg_display, 
      Scene.vi_display_sel_only, Scene.vi_display_vis_only) = [bprop("", "", False)] * 11
+>>>>>>> other
     Scene.vi_display_rp_fs = iprop("", "Point result font size", 4, 48, 9)
     Scene.vi_display_rp_fc = fvprop(4, "", "Font colour", [0.0, 0.0, 0.0, 1.0], 'COLOR', 0, 1)
     Scene.vi_display_rp_fsh = fvprop(4, "", "Font shadow", [0.0, 0.0, 0.0, 1.0], 'COLOR', 0, 1)

@@ -1,6 +1,10 @@
 import bpy
+<<<<<<< local
+from .vi_func import radmat, newrow
+=======
 from collections import OrderedDict
 from .vi_func import newrow
+>>>>>>> other
 
 from .envi_mat import envi_materials, envi_constructions
 envi_mats = envi_materials()
@@ -13,9 +17,15 @@ class Vi3DPanel(bpy.types.Panel):
     bl_region_type = "UI"
 
     def draw(self, context):
+<<<<<<< local
+        scene = context.scene
+        if scene.vi_display == 1:
+            view = context.space_data            
+=======
         scene = context.scene
         if scene.vi_display == 1:
             view = context.space_data
+>>>>>>> other
             layout = self.layout
 
             if scene.wr_disp_panel == 1:
@@ -37,8 +47,15 @@ class Vi3DPanel(bpy.types.Panel):
                 if scene.ss_disp_panel == 2 or scene.li_disp_panel == 2:
                     row = layout.row()
                     row.prop(view, "show_only_render")
+<<<<<<< local
+                    newrow(layout, 'Legend', scene, "vi_leg_display")
+#                    row = layout.row()
+#                    row.label(text = 'Legend')
+#                    row.prop(scene, "vi_leg_display")
+=======
                     newrow(layout, 'Legend', scene, "vi_leg_display")
 
+>>>>>>> other
                     if scene.render.engine == 'BLENDER_RENDER' and context.active_object and context.active_object.type == 'MESH':
                         row = layout.row()
                         row.prop(context.active_object, "show_wire")
@@ -57,9 +74,18 @@ class Vi3DPanel(bpy.types.Panel):
                         row.label(text="{:-<60}".format(""))
 
                     if scene.lic_disp_panel == 1:
+<<<<<<< local
+                        newrow(layout, "Compliance Panel", scene, "li_compliance")
+                        newrow(layout, "Asessment organisation:", scene, "li_assorg")
+                        newrow(layout, "Assesment individiual:", scene, "li_assind")
+                        newrow(layout, "Job number:", scene, "li_jobno")
+                        newrow(layout, "Project name:", scene, "li_projname")
+            newrow(layout, 'Display active', scene, 'vi_display')
+=======
                         propdict = OrderedDict([("Compliance Panel", "li_compliance"), ("Asessment organisation:", "li_assorg"), ("Assesment individiual:", "li_assind"), ("Job number:", "li_jobno"), ("Project name:", "li_projname")])
                         for prop in propdict.items():
                             newrow(layout, prop[0], scene, prop[1])
+>>>>>>> other
 
             newrow(layout, 'Display active', scene, 'vi_display')
 
@@ -81,6 +107,35 @@ class VIMatPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(cm, "livi_sense")
         row = layout.row()
+<<<<<<< local
+        
+        if bpy.data.node_groups.get(context.scene.restree):
+            ng = bpy.data.node_groups[context.scene.restree] 
+            if ng.nodes.get(context.scene.resnode):
+                node = ng.nodes[context.scene.resnode]
+                if 'LiVi' in node.bl_label:
+
+                    if node.inputs['Context in'].is_linked:
+                        connode = node.inputs['Context in'].links[0].from_node        
+                        if 'LiVi Compliance' in connode.bl_label:
+                            if cm.livi_sense:
+                                if connode.analysismenu == '0':
+                                    if connode.bambuildmenu == '2':
+                                        newrow(layout, "Space type:", cm, 'hspacemenu')
+                                    elif connode.bambuildmenu == '3':
+                                        newrow(layout, "Space type:", cm, 'rspacemenu')
+                                        if cm.rspacemenu == '2':
+                                            row = layout.row()
+                                            row.prop(cm, 'gl_roof')
+                                    elif connode.bambuildmenu == '4':
+                                        newrow(layout, "Space type:", cm, 'respacemenu')
+                                elif connode.analysismenu == '1':
+                                    newrow(layout, "Space type:", cm, 'rspacemenu')
+                                    if cm.rspacemenu == '2':
+                                        row = layout.row()
+                                        row.label('Warning: Not an assessable CfSH space')
+        
+=======
 
         if context.scene.get('liviparams'):
             connode = bpy.data.node_groups[context.scene['liviparams']['compnode'].split('@')[1]].nodes[context.scene['liviparams']['compnode'].split('@')[0]]
@@ -98,8 +153,15 @@ class VIMatPanel(bpy.types.Panel):
                 elif connode.analysismenu == '1':
                     newrow(layout, "Space type:", cm, 'crspacemenu')
 
+>>>>>>> other
         row = layout.row()
         row.label('LiVi Radiance type:')
+<<<<<<< local
+        
+        radname, matname, radnum = radmat(cm, context.scene)
+        row.label(radname.capitalize())
+        layout = self.layout
+=======
         row.prop(cm, 'radmatmenu')
         row = layout.row()
         for prop in cm.radmatdict[cm.radmatmenu]:
@@ -107,6 +169,7 @@ class VIMatPanel(bpy.types.Panel):
                  row.prop(cm, prop)
             else:
                 row = layout.row()
+>>>>>>> other
         row = layout.row()
         row.label("-----------------------------------------")
         newrow(layout, "EnVi Construction Type:", cm, "envi_con_type")
