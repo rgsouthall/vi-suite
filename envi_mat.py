@@ -1,7 +1,6 @@
 # EnVi materials database
-#s = 70
+s = 70
 from collections import OrderedDict
-from .vi_func import epentry
 
 class envi_materials(object):
     def __init__(self):
@@ -16,8 +15,7 @@ class envi_materials(object):
                         'Inner brick': ('Rough', '0.62', '1800', '840.00', '0.93', '0.700000', '0.700000', '100'),
                         'Outer brick': ('Rough', '0.96', '2000', '650.00', '0.90', '0.930000', '0.930000', '100'),
                         'Vermiculite insulating brick': ('Rough', '0.27', '700', '840.00', '0.90', '0.650000', '0.650000', '100'),
-                        'Honeycomb brick': ('Rough', '0.27', '1700', '1000.00', '0.90', '0.7', '0.7', '102'),
-                        'Hollow terracota': ('Rough', '0.3', '1389', '1000.00', '0.90', '0.7', '0.7', '102')}
+                        'Honeycomb brick': ('Rough', '0.27', '1700', '1000.00', '0.90', '0.7', '0.7', '102')}
         self.brick_dat = OrderedDict(sorted(self.brick_datd.items()))
         
         self.cladding_datd = {'Stucco': ('Smooth', '0.692', '1858', '836.00', '0.900000', '0.9200000', '0.920000', '25'),
@@ -40,7 +38,6 @@ class envi_materials(object):
         self.wood_dat = OrderedDict(sorted(self.wood_datd.items()))
         
         self.stone_datd = {'Sandstone': ('MediumSmooth', '1.83', '2200.0', '712.0', '0.90', '0.6', '0.6', '200'),
-                          'Limestone': ('MediumSmooth', '1.3', '2180.0', '720.0', '0.90', '0.6', '0.6', '200'),
                          'Clay tile': ('MediumSmooth', '0.85', '1900.0', '837.0', '0.90', '0.6', '0.6', '6'),
                          'Common earth': ('Rough', '1.28', '1460.0', '879.0', '0.90', '0.85', '0.85', '200'),                
                          'Gravel': ('Rough', '1.28', '1460.0', '879.0', '0.90', '0.85', '0.85', '200')}
@@ -68,41 +65,65 @@ class envi_materials(object):
                         'Cavity wall insul': ('Rough', '0.037', '300.0', '1000.0', '0.90', '0.6', '0.6', '100'),
                         'Roofing felt': ('Rough', '0.19', '960.0', '837.0', '0.90', '0.9', '0.9', '6'),
                         'Wilton wool carpet': ('Rough', '0.06', '186.0', '1360.0', '0.90', '0.60', '0.60', '5'),
-                        'Thermawall TW50': ('MediumSmooth', '0.022', '32.000', '1500', '0.900000', '0.600000', '0.600000', '200'),
-                        'Stramit': ('Rough', '0.102', '380.0', '645.2', '0.900000', '0.600000', '0.600000', '50')}
+                        'Thermawall TW50': ('MediumSmooth', '0.022', '32.000', '1500', '0.900000', '0.600000', '0.600000', '200')}
         self.insulation_dat = OrderedDict(sorted(self.insulation_datd.items()))
         
         self.namedict = OrderedDict()
         self.thickdict = OrderedDict()
         self.i = 0
         self.matdat = OrderedDict()
-        for dat in (self.brick_dat, self.cladding_dat, self.concrete_dat, self.gas_dat, self.insulation_dat, self.metal_dat, self.stone_dat, self.wood_dat, self.glass_dat, self.wgas_dat):
-            self.matdat.update(dat)
+        self.matdat.update(self.brick_dat)
+        self.matdat.update(self.cladding_dat)
+        self.matdat.update(self.concrete_dat)
+        self.matdat.update(self.gas_dat)
+        self.matdat.update(self.insulation_dat)
+        self.matdat.update(self.metal_dat)
+        self.matdat.update(self.stone_dat)
+        self.matdat.update(self.wood_dat)
+        self.matdat.update(self.glass_dat)
+        self.matdat.update(self.wgas_dat)
         
     def omat_write(self, idf_file, name, stringmat, thickness):
-        params = ('Name', 'Roughness', 'Thickness (m)', 'Conductivity (W/m-K)', 'Density (kg/m3)', 'Specific Heat Capacity (J/kg-K)', 'Thermal Absorptance', 'Solar Absorptance', 'Visible Absorptance')
-        paramvs = [name, stringmat[0], thickness] + stringmat[1:-1]        
-        idf_file.write(epentry("Material", params, paramvs))
+        idf_file.write("Material,\n\
+    {0:{width}}! - Name\n\
+    {2[0]:{width}}! - Roughness\n\
+    {1:{width}}! - Thickness (m)\n\
+    {2[1]:{width}}! - Conductivity (W/m-K)\n\
+    {2[2]:{width}}! - Density (kg/m3)\n\
+    {2[3]:{width}}! - Specific Heat Capacity (J/kg-K)\n\
+    {2[4]:{width}}! - Thermal Absorptance\n\
+    {2[5]:{width}}! - Solar Absorptance\n\
+    {2[6]:{width}}! - Visible Absorptance\n\n".format(name + ",", thickness + ",", stringmat, width = s-4))
 
-    def amat_write(self, idf_file, name, stringmat): 
-        params = ('Name', 'Resistance')
-        paramvs = (name, stringmat[0])
-        idf_file.write(epentry("Material:AirGap", params, paramvs))
+    def amat_write(self, idf_file, name, stringmat):        
+        idf_file.write("Material:AirGap,\n\
+    {0:{width}}! - Name\n\
+    {1:{width}}! - Resistance\n\n".format(name + ",", stringmat, width = s-4))
     
     def tmat_write(self, idf_file, name, stringmat, thickness):
-        print(stringmat)
-        params = ('Name', 'Optical Data Type', 'Window Glass Spectral Data Set Name', 'Thickness (m)', 'Solar Transmittance at Normal Incidence', 'Front Side Solar Reflectance at Normal Incidence',
-                  'Back Side Solar Reflectance at Normal Incidence', 'Visible Transmittance at Normal Incidence', 'Front Side Visible Reflectance at Normal Incidence', 'Back Side Visible Reflectance at Normal Incidence',
-                  'Infrared Transmittance at Normal Incidence', 'Front Side Infrared Hemispherical Emissivity', 'Back Side Infrared Hemispherical Emissivity', 'Conductivity (W/m-K)', 
-                  'Dirt Correction Factor for Solar and Visible Transmittance', 'Solar Diffusing')
-        paramvs = [name] + stringmat[1:3] + [thickness] + ['{:.3f}'.format(float(sm)) for sm in stringmat[4:-1]] + [1, ('No', 'Yes')[stringmat[-1]]]
-        idf_file.write(epentry("WindowMaterial:{}".format(stringmat[0]), params, paramvs))
+        idf_file.write("WindowMaterial:{2[0]}\n\
+    {0:{width}}! - Name\n\
+    {2[1]:{width}}! - Optical Data Type\n\
+    {2[2]:{width}}! - Window Glass Spectral Data Set Name\n\
+    {1:{width}}! - Thickness (m)\n\
+    {2[4]:{width}}! - Solar Transmittance at Normal Incidence\n\
+    {2[5]:{width}}! - Front Side Solar Reflectance at Normal Incidence\n\
+    {2[6]:{width}}! - Back Side Solar Reflectance at Normal Incidence\n\
+    {2[7]:{width}}! - Visible Transmittance at Normal Incidence\n\
+    {2[8]:{width}}! - Front Side Visible Reflectance at Normal Incidence\n\
+    {2[9]:{width}}! - Back Side Visible Reflectance at Normal Incidence\n\
+    {2[10]:{width}}! - Infrared Transmittance at Normal Incidence\n\
+    {2[11]:{width}}! - Front Side Infrared Hemispherical Emissivity\n\
+    {2[12]:{width}}! - Back Side Infrared Hemispherical Emissivity\n\
+    {2[13]:{width}}! - Conductivity (W/m-K)\n\n".format(name + ",", thickness + ",", stringmat, width = s-4))
     
-    def gmat_write(self, idf_file, name, stringmat, thickness):  
-        params = ('Name', 'Gas Type', 'Thickness')
-        paramvs = [name] + [stringmat[1]] + [thickness]
-        idf_file.write(epentry("WindowMaterial:Gas", params, paramvs)) 
- 
+    def gmat_write(self, idf_file, name, stringmat, thickness):           
+        idf_file.write("WindowMaterial:{1[0]}\n\
+    {0:{width}}! - Name\n\
+    {1[1]:{width}}! - Gas Type\n\
+    {2:{width}}! - Thickness\n\n".format(name + ",", stringmat, thickness + ";", width = s-4))   
+
+
 class envi_constructions(object):
     def __init__(self):
         self.wall_cond = {'External Wall 1': ('Standard Brick', 'Thermawall TW50', 'Inner concrete block'), 'Party Wall 1': ('Plaster board', 'Standard Brick', 'Plaster board')}
@@ -119,11 +140,10 @@ class envi_constructions(object):
     
     def con_write(self, idf_file, contype, name, nl, mn):
         con = (self.wall_con, self.roof_con, self.floor_con, self.door_con, self.glaze_con)[("Wall", "Roof", "Floor", "Door", "Window").index(contype)]
-        params = ['Name', 'Outside layer']
-        paramvs = [mn, '{}-{}'.format(con[name][0], nl)]
+        idf_file.write("Construction,\n\
+    {0:{width}}! - Name\n\
+    {1:{width}}! - Outside Layer\n".format(mn+",", con[name][0]+'-'+nl+(";", ",", ",", ",", ",")[len(con[name]) - 1], width = s-4))
         for i in range(len(con[name])):
             if i > 0:
-                params.append('Layer {}'.format(i))
-                paramvs.append('{}-{}'.format(con[name][i], nl))
-        idf_file.write(epentry('Construction', params, paramvs))
-       
+                idf_file.write("    {0:{width}}{1}".format(con[name][i]+'-'+nl+(';', ',', ',', ',', ',')[len(con[name]) - i - 1], "! - Layer "+str(i), width = s-4)+("\n\n", "\n", "\n", "\n", "\n")[len(con[name]) - i - 1])
+        
