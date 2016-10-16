@@ -585,7 +585,7 @@ def lhcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
     return reslists
                     
 def compcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):  
-    reslists, scores, escores, metric, emetric, pfs, epfs = [], [], [], [], [], [[]], [[]]
+    pfs, epfs = [[] for f in frames], [[] for f in frames]
     self['compmat'] = [material.name for material in self.data.materials if material.mattype == '1'][0]
     self['omax'], self['omin'], self['oave'] = {}, {}, {}
     self['crit'], self['ecrit'], spacetype = retcrits(simnode, self['compmat'])    
@@ -601,6 +601,7 @@ def compcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
     pf = ('Fail', 'Pass')
 
     for f, frame in enumerate(frames):
+        reslists, scores, escores, metric, emetric = [], [], [], [], []
         geom.layers.float.new('sv{}'.format(frame))
         geom.layers.float.new('df{}'.format(frame))
         geom.layers.float.new('res{}'.format(frame))
@@ -633,7 +634,7 @@ def compcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
             if pfile.check(curres) == 'CANCELLED':
                 bm.free()
                 return {'CANCELLED'}
-    
+
         resdf = [gp[dfres] for gp in geom if gp[cindex] > 0]
         ressv = [gp[svres] for gp in geom if gp[cindex] > 0]
         resillu = [gp[res] for gp in geom if gp[cindex] > 0]
@@ -668,7 +669,7 @@ def compcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
                     comps[str(frame)].append((0, 1)[sum(resdf)/reslen > float(c[3])])
                     comps[str(frame)].append(sum(resdf)/reslen)
                     dftotarea += oarea
-                    metric.append(['Average DF', c[1], '{:.1f}'.format(comps[str(frame)][-1]), pf[comps[str(frame)][-2]]])
+                    metric.append(['Average DF', c[3], '{:.1f}'.format(comps[str(frame)][-1]), pf[comps[str(frame)][-2]]])
                     
             elif c[0] == 'Min':
                 comps[str(frame)].append((0, 1)[min(resdf) > float(c[3])])
@@ -701,11 +702,17 @@ def compcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
                     metric.append(['% area with DF > {}'.format(c[3]), c[1], '{:.1f}'.format(passareapc), pf[passareapc >= float(c[1])]])
             scores.append(c[4])  
 
+        passfails = [m[-1] for m in metric]
+
         if simnode['coptions']['canalysis'] == '0':
-            if 'Fail' in [c for i, c in enumerate(list(zip(metric))[-1]) if scores[i] == '1'] or dfpass[str(frame)] == 1:
+            if 'Pass' not in passfails:
                 opf = 'FAIL'
-            elif 'pass' not in [c for i, c in enumerate(list(zip(metric))[-1]) if scores[i] == '0.75'] and len([c for i, c in enumerate(list(zip(metric))[-1]) if scores[i] == '0.75']) > 0:
-                if 'pass' not in [c for i, c in enumerate(list(zip(metric))[-1]) if scores[i] == '0.5'] and len([c for i, c in enumerate(list(zip(metric))[-1]) if scores[i] == '0.5']) > 0:
+            elif 'Fail' not in passfails:
+                opf = 'PASS'
+            elif 'Fail' in [c for i, c in enumerate(passfails) if scores[i] == '1']:
+                opf = 'FAIL'
+            elif 'Pass' not in [c for i, c in enumerate(passfails) if scores[i] == '0.75'] and len([c for i, c in enumerate(list(zip(metric))[-1]) if scores[i] == '0.75']) > 0:
+                if 'Pass' not in [c for i, c in enumerate(passfails) if scores[i] == '0.5'] and len([c for i, c in enumerate(list(zip(metric))[-1]) if scores[i] == '0.5']) > 0:
                     opf = 'FAIL'
                 else:
                     opf = 'PASS'
@@ -733,12 +740,10 @@ def compcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
             for e in self['ecrit']:
                 if e[0] == 'Percent':
                     if e[2] == 'DF':
-                        edfpass[str(frame)] = [1, (0, 1)[sum(resdf)/reslen > float(e[3])], sum(resdf)/reslen]
-                        edfpassarea = edfpassarea + oarea if sum(resdf)/(reslen) > float(e[3]) else edfpassarea
-                        ecomps[str(frame)].append((0, 1)[sum(resdf)/reslen > float(e[3])])
-                        ecomps[str(frame)].append(sum(resdf)/reslen)
-                        edftotarea += oarea
-                        emetric.append(['% area with DF > {}'.format(e[3]), e[1], '{:.1f}'.format(ecomps[str(frame)][-1]), pf[ecomps[str(frame)][-2]]])
+                        epassareapc = 100 * sum([area for p, area in enumerate(oareas) if resdf[p] > float(e[3])])/oarea
+                        ecomps[str(frame)].append((0, 1)[sum([area * resdf[p] for p, area in enumerate(oareas)])/oarea > float(e[3])])
+                        ecomps[str(frame)].append(sum([area * resdf[p] for p, area in enumerate(oareas)])/oarea)
+                        emetric.append(['% area with DF > {}'.format(e[3]), e[1], '{:.1f}'.format(epassareapc), pf[epassareapc >= float(e[1])]])
                         
                     if e[2] == 'PDF':
                         edfpass[str(frame)] = 1
@@ -772,15 +777,22 @@ def compcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
                 crits.append(self['crit'])
                 escores.append(e[4])
                 
-            if 'fail' in [c for i, c in enumerate(list(zip(emetric))[-1]) if escores[i] == '1'] or dfpass[str(frame)] == 1:
+            epassfails = [em[-1] for em in emetric[2:]]
+
+            if 'Pass' not in epassfails:
+                epf = 'FAIL'     
+            if 'Fail' not in epassfails:
+                epf = 'PASS' 
+            elif 'Fail' in [c for i, c in enumerate(epassfails) if escores[i] == '1']:
                 epf = 'FAIL'
-            elif 'pass' not in [c for i, c in enumerate(list(zip(emetric))[-1]) if escores[i] == '0.75'] and len([c for i, c in enumerate(list(zip(emetric))[-1]) if escores[i] == '0.75']) > 0:
-                if 'pass' not in [c for i, c in enumerate(list(zip(emetric))[-1]) if escores[i] == '0.5'] and len([c for i, c in enumerate(list(zip(emetric))[-1]) if escores[i] == '0.5']) > 0:
+            elif 'Pass' not in [c for i, c in enumerate(epassfails) if escores[i] == '0.75'] and len([c for i, c in enumerate(list(zip(emetric))[-1]) if escores[i] == '0.75']) > 0:
+                if 'Pass' not in [c for i, c in enumerate(epassfails) if escores[i] == '0.5'] and len([c for i, c in enumerate(list(zip(emetric))[-1]) if escores[i] == '0.5']) > 0:
                     epf = 'FAIL'
                 else:
                     epf = 'EXEMPLARY'
             else:
                 epf = 'EXEMPLARY'
+
             epfs[f].append(epf)
     
         if dfpass[str(frame)] == 1:
@@ -788,10 +800,9 @@ def compcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
         if edfpass[str(frame)] == 1:
             edfpass[str(frame)] = 2 if edfpassarea/edftotarea >= (0.8, 0.5)[simnode['coptions']['canalysis'] == '0' and simnode['coptions']['buildtype'] == '4'] else edfpass[str(frame)]
         
-    self['comps'], self['ecomps'] = comps, ecomps
-    smetric = [['Standard: {}'.format(('BREEAM HEA1', 'CfSH', 'Green Star', 'LEED EQ8.1')[int(simnode['coptions']['Type'])]), '', '', ''], 
-                ['Space type: {}'.format(spacetype), '', '', ''], ['', '', '', ''], ['Standard requirements:', 'Target', 'Result', 'Pass/Fail']] + metric
-    self['tablecomp{}'.format(frame)] = smetric if not self['ecrit'] else smetric + emetric
+        smetric = [['Standard: {}'.format(('BREEAM HEA1', 'CfSH', 'Green Star', 'LEED EQ8.1')[int(simnode['coptions']['Type'])]), '', '', ''], 
+                    ['Space type: {}'.format(spacetype), '', '', ''], ['', '', '', ''], ['Standard requirements:', 'Target', 'Result', 'Pass/Fail']] + metric
+        self['tablecomp{}'.format(frame)] = smetric if not self['ecrit'] else smetric + emetric
 
     bm.to_mesh(self.data)
     bm.free()
@@ -860,11 +871,11 @@ def udidacalcapply(self, scene, frames, rccmds, simnode, curres, pfile):
                 finalwattm2 = inner(wsensearray, vecvals).astype(float32)
                 wsensearraym2 = (wsensearray.T * chareas).T.astype(float32)
                 finalwatt = inner(wsensearraym2, vecvals).astype(float32)  
-                dabool = choose(finalillu >= simnode['coptions']['dalux'], [0, 1]) 
-                udilbool = choose(finalillu < simnode['coptions']['damin'], [0, 1])
-                udisbool = choose(finalillu < simnode['coptions']['dasupp'], [0, 1]) - udilbool
-                udiabool = choose(finalillu < simnode['coptions']['daauto'], [0, 1]) - udilbool - udisbool
-                udihbool = choose(finalillu >= simnode['coptions']['daauto'], [0, 1])                        
+                dabool = choose(finalillu >= simnode['coptions']['dalux'], [0, 1]).astype(int8)
+                udilbool = choose(finalillu < simnode['coptions']['damin'], [0, 1]).astype(int8)
+                udisbool = choose(finalillu < simnode['coptions']['dasupp'], [0, 1]).astype(int8) - udilbool
+                udiabool = choose(finalillu < simnode['coptions']['daauto'], [0, 1]).astype(int8) - udilbool - udisbool
+                udihbool = choose(finalillu >= simnode['coptions']['daauto'], [0, 1]).astype(int8)                       
                 daareares = (dabool.T*chareas).T             
                 udilareares = (udilbool.T*chareas).T
                 udisareares = (udisbool.T*chareas).T
@@ -883,8 +894,8 @@ def udidacalcapply(self, scene, frames, rccmds, simnode, curres, pfile):
                 sdaareas = where([sv > 0 for sv in svres], chareas, 0)
             else:
                 sdaareas = chareas
-            sdabool = choose(finalillu >= luxmin, [0, 1])
-            asebool = choose(finalillu >= luxmax, [0, 1])
+            sdabool = choose(finalillu >= luxmin, [0, 1]).astype(int8)
+            asebool = choose(finalillu >= luxmax, [0, 1]).astype(int8)
             aseareares = (asebool.T*chareas).T
             sdaareares = (sdabool.T*sdaareas).T            
             sdares = sdabool.sum(axis = 1)*100/hours
@@ -2042,8 +2053,9 @@ def retdp(mres, dp):
 def draw_index_distance(posis, res, fontsize, fontcol, shadcol, distances):
     if len(distances):
         try:
-            nres = [str(int(r)) for r in res]
-            fsdist = (fontsize/distances).astype(int)
+            dp = 0 if max(res) > 100 else 1
+            nres = ['{:.{precision}f}'.format(r, precision = dp) for r in res]
+            fsdist = (fontsize/distances).astype(int8)
             xposis = posis[:,0]
             yposis = posis[:,1]
 #            [(blf.size(0, fontsize, fsdist[ri]), blf.position(0, xposis[ri] - int(0.5*blf.dimensions(0, nr)[0]), yposis[ri] - int(0.5 * blf.dimensions(0, nr)[1]), 0.99), blf.draw(0, nr)) for ri, nr in enumerate(nres)]
