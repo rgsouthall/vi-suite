@@ -19,7 +19,7 @@
 import bpy, os, sys, multiprocessing, mathutils, bmesh, datetime, colorsys, bgl, blf, shlex, bpy_extras
 #from collections import OrderedDict
 from subprocess import Popen, PIPE, STDOUT
-from numpy import int8, array, digitize, amax, amin, average, zeros, inner, transpose, nan, set_printoptions, choose, clip, where
+from numpy import int8, float32, array, digitize, amax, amin, average, zeros, inner, transpose, nan, set_printoptions, choose, clip, where
 set_printoptions(threshold=nan)
 from numpy import sum as nsum
 from numpy import max as nmax
@@ -430,7 +430,7 @@ def basiccalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
             
         for chunk in chunks([g for g in geom if g[rt]], int(scene['viparams']['nproc']) * 500):
             rtrun = Popen(rtcmds[f].split(), stdin = PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True).communicate(input = '\n'.join([c[rt].decode('utf-8') for c in chunk]))   
-            xyzirrad = array([[float(v) for v in sl.split('\t')[:3]] for sl in rtrun[0].splitlines()])
+            xyzirrad = array([[float(v) for v in sl.split('\t')[:3]] for sl in rtrun[0].splitlines()]).astype(float32)
             virrad = nsum(xyzirrad * array([0.26, 0.67, 0.065]), axis = 1)
             firrad = virrad * 1.64
             illu = virrad * 179
@@ -447,7 +447,7 @@ def basiccalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
                 bm.free()
                 return {'CANCELLED'}
 
-        ovirrad = array([g[virradres] for g in geom])
+        ovirrad = array([g[virradres] for g in geom]).astype(float32)
         self['omax']['virrad{}'.format(frame)] = max(ovirrad)
         self['omax']['illu{}'.format(frame)] =  max(ovirrad * 179)
         self['omax']['df{}'.format(frame)] =  max(ovirrad * 1.79)
@@ -526,7 +526,7 @@ def lhcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
 
         for chunk in chunks(gps, int(scene['viparams']['nproc']) * 200):
             rtrun = Popen(rtcmds[f].split(), stdin = PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True).communicate(input = '\n'.join([c[rt].decode('utf-8') for c in chunk]))   
-            xyzirrad = array([[float(v) for v in sl.split('\t')[:3]] for sl in rtrun[0].splitlines()])
+            xyzirrad = array([[float(v) for v in sl.split('\t')[:3]] for sl in rtrun[0].splitlines()]).astype(float32)
             virrad = nsum(xyzirrad * array([0.26, 0.67, 0.065]), axis = 1) * 1e-3
             firrad = virrad * 1.64
             illu = virrad * 179e-3
@@ -618,7 +618,7 @@ def compcalcapply(self, scene, frames, rtcmds, simnode, curres, pfile):
         
         for chunk in chunks([g for g in geom if g[rt]], int(scene['viparams']['nproc']) * 50):
             rtrun = Popen(rtcmds[f].split(), stdin = PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True).communicate(input = '\n'.join([c[rt].decode('utf-8') for c in chunk]))   
-            xyzirrad = array([[float(v) for v in sl.split('\t')[:3]] for sl in rtrun[0].splitlines()])
+            xyzirrad = array([[float(v) for v in sl.split('\t')[:3]] for sl in rtrun[0].splitlines()]).astype(float32)
             virrad = nsum(xyzirrad * array([0.26, 0.67, 0.065]), axis = 1)
             illu = virrad * 179
             df = illu * 0.01
@@ -819,7 +819,7 @@ def udidacalcapply(self, scene, frames, rccmds, simnode, curres, pfile):
     cbdm_hours = [h for h in range(simnode['coptions']['cbdm_sh'], simnode['coptions']['cbdm_eh'] + 1)]
     dno, hno = len(cbdm_days), len(cbdm_hours)    
     (luxmin, luxmax) = (simnode['coptions']['dalux'], simnode['coptions']['asemax']) if scene['viparams']['visimcontext'] != 'LiVi Compliance' else (300, 1000)
-    vecvals = array([vv[2:] for vv in vecvals if vv[1] < simnode['coptions']['weekdays']])
+    vecvals = array([vv[2:] for vv in vecvals if vv[1] < simnode['coptions']['weekdays']]).astype(float32)
     hours = vecvals.shape[0]
     restypes = ('da', 'sda', 'ase', 'res', 'udilow', 'udisup', 'udiauto', 'udihi', 'kW', 'kW/m2', 'illu')
     self['livires']['cbdm_days'] = cbdm_days
@@ -850,16 +850,16 @@ def udidacalcapply(self, scene, frames, rccmds, simnode, curres, pfile):
                 
         for ch, chunk in enumerate(chunks([g for g in geom if g[rt]], int(scene['viparams']['nproc']) * 40)):
             sensrun = Popen(rccmds[f].split(), stdin=PIPE, stdout=PIPE, universal_newlines=True).communicate(input = '\n'.join([c[rt].decode('utf-8') for c in chunk]))
-            resarray = array([[float(v) for v in sl.split('\t') if v] for sl in sensrun[0].splitlines() if sl not in ('\n', '\r\n')]).reshape(len(chunk), 146, 3)
-            chareas = array([c.calc_area() for c in chunk]) if self['cpoint'] == '0' else array([vertarea(bm, c) for c in chunk])
-            sensarray = nsum(resarray*illuarray, axis = 2)
-            wsensearray  = nsum(resarray*fwattarray, axis = 2)
-            finalillu = inner(sensarray, vecvals) 
+            resarray = array([[float(v) for v in sl.split('\t') if v] for sl in sensrun[0].splitlines() if sl not in ('\n', '\r\n')]).reshape(len(chunk), 146, 3).astype(float32)
+            chareas = array([c.calc_area() for c in chunk]) if self['cpoint'] == '0' else array([vertarea(bm, c) for c in chunk]).astype(float32)
+            sensarray = nsum(resarray*illuarray, axis = 2).astype(float32)
+            wsensearray  = nsum(resarray*fwattarray, axis = 2).astype(float32)
+            finalillu = inner(sensarray, vecvals).astype(float32)
 
             if scene['viparams']['visimcontext'] != 'LiVi Compliance':            
-                finalwattm2 = inner(wsensearray, vecvals)
-                wsensearraym2 = (wsensearray.T * chareas).T
-                finalwatt = inner(wsensearraym2, vecvals)  
+                finalwattm2 = inner(wsensearray, vecvals).astype(float32)
+                wsensearraym2 = (wsensearray.T * chareas).T.astype(float32)
+                finalwatt = inner(wsensearraym2, vecvals).astype(float32)  
                 dabool = choose(finalillu >= simnode['coptions']['dalux'], [0, 1]) 
                 udilbool = choose(finalillu < simnode['coptions']['damin'], [0, 1])
                 udisbool = choose(finalillu < simnode['coptions']['dasupp'], [0, 1]) - udilbool

@@ -17,9 +17,9 @@
 # ##### END GPL LICENSE BLOCK #####
 
 bl_info = {
-    "name": "VI-Suite v04",
+    "name": "VI-Suite Development Branch",
     "author": "Ryan Southall",
-    "version": (0, 4, 0),
+    "version": (0, 4, 1),
     "blender": (2, 7, 8),
     "api":"",
     "location": "Node Editor & 3D View > Properties Panel",
