@@ -1,7 +1,9 @@
-import bpy
-from .vi_func import radmat, newrow
+import bpy, datetime
+from collections import OrderedDict
+from .vi_func import newrow, newrow2
 
 from .envi_mat import envi_materials, envi_constructions
+from .vi_func import retdates
 envi_mats = envi_materials()
 envi_cons = envi_constructions()
 
@@ -10,66 +12,175 @@ class Vi3DPanel(bpy.types.Panel):
     bl_label = "VI-Suite Display"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-
+        
     def draw(self, context):
         scene = context.scene
-        if scene.vi_display == 1:
-            view = context.space_data            
+        if scene.get('viparams') and scene['viparams'].get('vidisp'):            
+            view = context.space_data
             layout = self.layout
 
-            if scene.wr_disp_panel == 1:
-                newrow(layout, 'Legend', scene, "vi_leg_display")
-
-            if scene.sp_disp_panel == 1:
-                for i in (("Day of year:", "solday"), ("Hour of year:", "solhour"), ("Sunpath scale:", "soldistance"), ("Display hours:", "hourdisp")):
+            if scene['viparams']['vidisp'] == 'wr' and 'Wind_Plane' in [o['VIType'] for o in bpy.data.objects if o.get('VIType')]:
+                row = layout.row()
+                row.operator('view3d.wrdisplay', text = 'Wind Metrics')#('INVOKE_DEFAULT'')
+                
+            elif scene['viparams']['vidisp'] == 'wrpanel' and scene.vi_display:
+                newrow(layout, 'Wind metric:', scene, 'wind_type')
+                newrow(layout, 'Colour:', scene, 'vi_leg_col')
+                
+            elif scene['viparams']['vidisp'] == 'sp' and scene.vi_display:
+                (sdate, edate) = retdates(scene.solday, 365, 2015)
+                for i in (("Day of year: {}/{}".format(sdate.day, sdate.month), "solday"), ("Time of day:", "solhour"), ("Display hours:", "hourdisp"), ("Display time:", "timedisp")):
                     newrow(layout, i[0], scene, i[1])
-                if scene.hourdisp:
-                    for i in (("Font size:", "vi_display_rp_fs"), ("Font colour:", "vi_display_rp_fc"), ("Font shadow:", "vi_display_rp_fsh")):
+                if scene.hourdisp or scene.timedisp:
+                    for i in (("Font size:", "vi_display_rp_fs"), ("Font colour:", "vi_display_rp_fc"), ("Font shadow:", "vi_display_rp_sh"), ("Shadow colour:", "vi_display_rp_fsh")):
                         newrow(layout, i[0], scene, i[1])
-
-            if scene.ss_disp_panel in (1,2) or scene.li_disp_panel in (1,2):
+                
+            elif scene['viparams']['vidisp'] in ('ss', 'li', 'lc'):
                 row = layout.row()
-                row.prop(scene, "vi_disp_3d")
+                row.prop(scene, "vi_disp_3d")                 
                 row = layout.row()
-                if scene.resnode == 'VI Shadow Study':
-                    row.operator("view3d.lidisplay", text="Shadow Display")
+                if scene['viparams']['vidisp'] == 'ss':
+                    row.operator("view3d.ssdisplay", text="Shadow Display")
                 else:
-                    row.operator("view3d.lidisplay", text="Radiance Display")
+                    row.operator("view3d.livibasicdisplay", text="Radiance Display")
 
-                if scene.ss_disp_panel == 2 or scene.li_disp_panel == 2:
-                    row = layout.row()
-                    row.prop(view, "show_only_render")
-                    newrow(layout, 'Legend', scene, "vi_leg_display")
-#                    row = layout.row()
-#                    row.label(text = 'Legend')
-#                    row.prop(scene, "vi_leg_display")
-                    if scene.render.engine == 'BLENDER_RENDER' and context.active_object and context.active_object.type == 'MESH':
-                        row = layout.row()
-                        row.prop(context.active_object, "show_wire")
+            elif scene['viparams']['vidisp'] in ('sspanel', 'lipanel', 'lcpanel') and [o for o in bpy.data.objects if o.lires] and scene.vi_display:
+                row = layout.row()
+                row.prop(view, "show_only_render")
+
+                if not scene.ss_disp_panel:
+                    if scene['viparams']['visimcontext'] == 'LiVi CBDM':
+                        if scene['liparams']['unit'] in ('DA (%)', 'sDA (%)', 'UDI-f (%)', 'UDI-s (%)', 'UDI-a (%)', 'UDI-e (%)', 'ASE (hrs)', 'Min lux', 'Max lux', 'Ave lux'):
+                            newrow(layout, 'Result type:', scene, "li_disp_da")
+                        elif scene['liparams']['unit'] in ('Mlxh', u'kWh/m\u00b2 (f)', u'kWh/m\u00b2 (v)'):
+                            newrow(layout, 'Result type:', scene, "li_disp_exp")
+                        elif scene['liparams']['unit'] in ('kWh', 'kWh/m2'):
+                            newrow(layout, 'Result type:', scene, "li_disp_irrad")
+
+                    elif scene['viparams']['visimcontext'] == 'LiVi Compliance': 
+                        if scene['liparams']['unit'] in ('sDA (%)', 'ASE (hrs)'):
+                            newrow(layout, 'Metric:', scene, 'li_disp_sda')
+
+                        else:
+                            newrow(layout, 'Metric:', scene, 'li_disp_sv')
+                    elif scene['viparams']['visimcontext'] == 'LiVi Basic':
+                        newrow(layout, 'Metric:', scene, 'li_disp_basic')
+                        
+                    newrow(layout, 'Legend max:', scene, "vi_leg_max")
+                    newrow(layout, 'Legend min:', scene, "vi_leg_min")
+                    newrow(layout, 'Legend scale:', scene, "vi_leg_scale")
+                    newrow(layout, 'Legend colour:', scene, "vi_leg_col")
                     
-                    if int(context.scene.vi_disp_3d) == 1:
-                        newrow(layout, "3D Level", scene, "vi_disp_3dlevel")
+                    if scene['liparams']['unit'] in ('DA (%)', 'sDA (%)', 'UDI-f (%)', 'UDI-s (%)', 'UDI-a (%)', 'UDI-e (%)', 'ASE (hrs)', 'Max lux', 'Ave lux', 'Min lux', 'kWh', 'kWh/m2'):
+                        newrow(layout, 'Scatter max:', scene, "vi_scatter_max")
+                        newrow(layout, 'Scatter min:', scene, "vi_scatter_min")
+                
+                if context.active_object and context.active_object.type == 'MESH':
+                    newrow(layout, 'Draw wire:', scene, 'vi_disp_wire')                    
+                
+                if int(context.scene.vi_disp_3d) == 1:
+                    newrow(layout, "3D Level", scene, "vi_disp_3dlevel")                        
+                
+                newrow(layout, "Transparency", scene, "vi_disp_trans")
 
-                    if context.mode != "EDIT":
+                if context.mode != "EDIT":
+                    row = layout.row()
+                    row.label(text="{:-<48}".format("Point visualisation "))
+                    propdict = OrderedDict([('Enable', "vi_display_rp"), ("Selected only:", "vi_display_sel_only"), ("Visible only:", "vi_display_vis_only"), ("Font size:", "vi_display_rp_fs"), ("Font colour:", "vi_display_rp_fc"), ("Font shadow:", "vi_display_rp_sh"), ("Shadow colour:", "vi_display_rp_fsh"), ("Position offset:", "vi_display_rp_off")])
+                    for prop in propdict.items():
+                        newrow(layout, prop[0], scene, prop[1])
+                    row = layout.row()
+                    row.label(text="{:-<60}".format(""))
+ 
+            elif scene['viparams']['vidisp'] in ('en', 'enpanel'):   
+                resnode = bpy.data.node_groups[scene['viparams']['resnode'].split('@')[1]].nodes[scene['viparams']['resnode'].split('@')[0]]
+                rl = resnode['reslists']
+                zrl = list(zip(*rl))
+
+                if scene.en_disp_type == '1':
+                    zresdict = {}
+                    lmetrics = []
+                    vresdict = {"Max Flow in": "resazlmaxf_disp", "Min Flow in": "resazlminf_disp", "Ave Flow in": "resazlavef_disp"}                    
+                else:                    
+                    lmetrics = set([zr for zri, zr in enumerate(zrl[3]) if zrl[1][zri] == 'Linkage' and zrl[0][zri] == str(resnode["AStart"])])
+                    zmetrics = set([zr for zri, zr in enumerate(zrl[3]) if zrl[1][zri] == 'Zone' and zrl[0][zri] == str(resnode["AStart"])])
+                    zresdict = {"Temperature (degC)": "reszt_disp", 'Humidity (%)': 'reszh_disp', 'Heating (W)': 'reszhw_disp', 'Cooling (W)': 'reszcw_disp', 
+                                'CO2 (ppm)': 'reszco_disp', 'PMV': 'reszpmv_disp', 'PPD (%)': 'reszppd_disp', 'Solar gain (W)': 'reszsg_disp', 
+                                'Air heating (W)': 'reszahw_disp', 'Air cooling (W)': 'reszacw_disp', 'HR heating (W)': 'reshrhw_disp'}
+                    vresdict = {"Opening Factor": "reszof_disp", "Linkage Flow in": "reszlf_disp"}             
+                
+                if scene['viparams']['vidisp'] == 'en': 
+                    newrow(layout, 'Static/Parametric', scene, 'en_disp_type')
+                    if scene.en_disp_type == '1':
+                        row = layout.row()               
+                        row.prop(resnode, '["AStart"]')
+                        row.prop(resnode, '["AEnd"]')
+
+                    else:  
+                        if len(set(zrl[0])) > 1:
+                            newrow(layout, 'Frame:', resnode, '["AStart"]')
+                        row = layout.row() 
+                        row.label(text = 'Start/End day:')
+                        row.prop(resnode, '["Start"]')
+                        row.prop(resnode, '["End"]')
+                        row = layout.row() 
+                        row.label(text = 'Ambient')
+                        row = layout.row() 
+                        row.prop(scene, 'resaa_disp')
+                        row.prop(scene, 'resas_disp')
+                
+                    for ri, rzname in enumerate(zmetrics):
+                        if ri == 0:                    
+                            row = layout.row()
+                            row.label(text = 'Zone')                    
+                        if not ri%2:
+                            row = layout.row()  
+                        if rzname in zresdict:
+                            row.prop(scene, zresdict[rzname])
+                    
+                    for ri, rname in enumerate(lmetrics):
+                        if ri == 0:                    
+                            row = layout.row()
+                            row.label(text = 'Ventilation')                    
+                        if not ri%2:
+                            row = layout.row()                            
+                        if rname in vresdict:
+                            row.prop(scene, vresdict[rname])  
+                    if lmetrics:    
+                        newrow(layout, 'Link to object', scene, 'envi_flink')  
+                    
+                    row = layout.row() 
+                    if scene.en_disp_type == '0':
+                        row.operator("view3d.endisplay", text="EnVi Display")
+                    elif scene.en_disp_type == '1':
+                        row.operator("view3d.enpdisplay", text="EnVi Display")
+                        
+            if scene['viparams']['vidisp'] == 'enpanel':                                
+                if scene.en_disp_type == '0':
+                    newrow(layout, 'Display unit:', scene, 'en_disp_unit')  
+                    newrow(layout, 'Bar colour:', scene, "vi_leg_col")
+                    
+                    if len(set(zrl[0])) > 1:
+                        newrow(layout, 'Parametric frame:', resnode, '["AStart"]')
+                    envimenudict = {'Temperature (degC)': ('en_temp_min', 'en_temp_max'), 'Humidity (%)' : ('en_hum_min', 'en_hum_max'), 'Heating (W)': ('en_heat_min', 'en_heat_max'),
+                                'Cooling (W)': ('en_cool_min', 'en_cool_max'), 'Solar gain (W)': ('en_shg_min', 'en_shg_max'), 'CO2 (ppm)': ('en_co2_min', 'en_co2_max'),
+                                'PMV': ('en_pmv_min', 'en_pmv_max'), 'PPD (%)': ('en_ppd_min', 'en_ppd_max'), 'Air heating (W)': ('en_aheat_min', 'en_aheat_max'), 
+                                'Air cooling (W)': ('en_acool_min', 'en_acool_max'), 'HR heating (W)': ('en_hrheat_min', 'en_hrheat_max'), 'Heat balance (W)': ('en_heatb_min', 'en_heatb_max'),
+                                'Occupancy': ('en_occ_min', 'en_occ_max'), 'Infiltration (ACH)': ('en_iach_min', 'en_iach_max'), 'Infiltration (m3/s)': ('en_im3s_min', 'en_im3s_max')}
+               
+                elif scene.en_disp_type == '1':
+                    newrow(layout, 'Display unit:', scene, 'en_disp_punit')  
+                    newrow(layout, 'Legend colour:', scene, "vi_leg_col")
+                    envimenudict = {'Bar chart range:': ('bar_min', 'bar_max')}
+
+                for envirt in envimenudict:
+                    if envirt in zmetrics:
                         row = layout.row()
-                        row.label(text="{:-<48}".format("Point visualisation "))
-                        newrow(layout, "Enable:", scene, "vi_display_rp")
-                        newrow(layout, "Selected only:", scene, "vi_display_sel_only")
-                        newrow(layout, "Visible only:", scene, "vi_display_vis_only")
-                        newrow(layout, "Font size:", scene, "vi_display_rp_fs")
-                        newrow(layout, "Font colour:", scene, "vi_display_rp_fc")
-                        newrow(layout, "Font shadow:", scene, "vi_display_rp_fsh")
-                        row = layout.row()
-                        row.label(text="{:-<60}".format(""))
-
-                    if scene.lic_disp_panel == 1:
-                        newrow(layout, "Compliance Panel", scene, "li_compliance")
-                        newrow(layout, "Asessment organisation:", scene, "li_assorg")
-                        newrow(layout, "Assesment individiual:", scene, "li_assind")
-                        newrow(layout, "Job number:", scene, "li_jobno")
-                        newrow(layout, "Project name:", scene, "li_projname")
-            newrow(layout, 'Display active', scene, 'vi_display')
-
+                        row.label(envirt)
+                        row.prop(scene, envimenudict[envirt][0])
+                        row.prop(scene, envimenudict[envirt][1])                                  
+            if scene.vi_display:            
+                newrow(layout, 'Display active', scene, 'vi_display')
 
 class VIMatPanel(bpy.types.Panel):
     bl_label = "VI-Suite Material"
@@ -82,378 +193,392 @@ class VIMatPanel(bpy.types.Panel):
         return context.material
 
     def draw(self, context):
-        cm = context.material
+        cm, scene = context.material, context.scene
         layout = self.layout
-        row = layout.row()
-        row.prop(cm, "vi_shadow")
-        row = layout.row()
-        row.prop(cm, "livi_sense")
-        row = layout.row()
-        
-        if bpy.data.node_groups.get(context.scene.restree):
-            ng = bpy.data.node_groups[context.scene.restree] 
-            if ng.nodes.get(context.scene.resnode):
-                node = ng.nodes[context.scene.resnode]
-                if 'LiVi' in node.bl_label:
-
-                    if node.inputs['Context in'].is_linked:
-                        connode = node.inputs['Context in'].links[0].from_node        
-                        if 'LiVi Compliance' in connode.bl_label:
-                            if cm.livi_sense:
-                                if connode.analysismenu == '0':
-                                    if connode.bambuildmenu == '2':
-                                        newrow(layout, "Space type:", cm, 'hspacemenu')
-                                    elif connode.bambuildmenu == '3':
-                                        newrow(layout, "Space type:", cm, 'rspacemenu')
-                                        if cm.rspacemenu == '2':
-                                            row = layout.row()
-                                            row.prop(cm, 'gl_roof')
-                                    elif connode.bambuildmenu == '4':
-                                        newrow(layout, "Space type:", cm, 'respacemenu')
-                                elif connode.analysismenu == '1':
-                                    newrow(layout, "Space type:", cm, 'rspacemenu')
-                                    if cm.rspacemenu == '2':
-                                        row = layout.row()
-                                        row.label('Warning: Not an assessable CfSH space')
-        
-        row = layout.row()
-        row.label('LiVi Radiance type:')
-        
-        radname, matname, radnum = radmat(cm, context.scene)
-        row.label(radname.capitalize())
-        layout = self.layout
-        row = layout.row()
-        row.label("-----------------------------------------")
-        newrow(layout, "EnVi Construction Type:", cm, "envi_con_type")
-        row = layout.row()
-        if cm.envi_con_type not in ("Aperture", "Shading", "None"):
+        newrow(layout, 'Material type', cm, "mattype")
+        if cm.mattype == '0':
+            rmmenu(layout, cm)
+            newrow(layout, "EnVi Construction Type:", cm, "envi_con_type")
             row = layout.row()
-            row.prop(cm, "envi_boundary")
-            row = layout.row()
-            row.prop(cm, "afsurface")
-            newrow(layout, "Construction Make-up:", cm, "envi_con_makeup")
-
-            if cm.envi_con_makeup == '1':
-                newrow(layout, "Outside layer:", cm, "envi_layero")
-                row = layout.row()
-                if cm.envi_layero == '1':                    
-                    if cm.envi_con_type == "Window":
-                        newrow(layout, "Glass Type:", cm, "envi_export_glasslist_lo")
-                    elif cm.envi_con_type in ("Wall", "Roof", "Floor", "Door"):
-                        newrow(layout, "Outer layer type:", cm, "envi_layeroto")
-                        newrow(layout, "Outer layer cm:", cm, ("envi_export_bricklist_lo", "envi_export_claddinglist_lo", "envi_export_concretelist_lo", "envi_export_metallist_lo", "envi_export_stonelist_lo", "envi_export_woodlist_lo", "envi_export_gaslist_lo", "envi_export_insulationlist_lo")[int(cm.envi_layeroto)])
-                        row = layout.row()
-                        row.prop(cm, "envi_export_lo_thi")
-
-                elif cm.envi_layero == '2' and cm.envi_con_type != 'Window':
-                    for end in ('name', 0, 'thi', 'tc', 0, 'rho', 'shc', 0, 'tab', 'sab', 0, 'vab', 'rough'):
-                        if end:
-                            row.prop(cm, '{}{}'.format("envi_export_l0_", end)) 
-                        else: 
-                            row = layout.row()
-
-                elif cm.envi_layero == '2' and cm.envi_con_type == 'Window':
-                    for end in ('name', 0, 'thi', 'tc', 0, 'odt', 'sds', 0, 'stn', 'fsn', 'bsn', 0, 'vtn', 'fvrn', 'bvrn', 0, 'itn', 'fie', 'bie'):
-                        if end:
-                            row.prop(cm, '{}{}'.format("envi_export_l0_", end))  
-                        else:
-                            row = layout.row()
-
-                if cm.envi_layero != '0':
-                    newrow(layout, "2nd layer:", cm, "envi_layer1")
+            if cm.envi_con_type not in ("Aperture", "Shading", "None"):
+                newrow(layout, 'Intrazone Boundary', cm, "envi_boundary")
+                newrow(layout, 'Airflow surface:', cm, "envi_afsurface")
+                if not cm.envi_boundary and not cm.envi_afsurface:
+                    newrow(layout, 'Thermal mass:', cm, "envi_thermalmass")
+                newrow(layout, "Construction Make-up:", cm, "envi_con_makeup")
+                if cm.envi_con_makeup == '1':
+                    newrow(layout, "Outside layer:", cm, "envi_layero")
                     row = layout.row()
-                    if cm.envi_layer1 == '1':
-                        if cm.envi_con_type == "Window":
-                            row.label("Gas Type:")
-                            row.prop(cm, ("envi_export_wgaslist_l1"))
-                            row.prop(cm, "envi_export_l1_thi")
-                        elif cm.envi_con_type in ("Wall", "Roof", "Floor", "Door"):
-                            row.label("2nd layer type:")
-                            row.prop(cm, "envi_layer1to")
-                            newrow(layout, "2nd layer cm:", cm, ("envi_export_bricklist_l1", "envi_export_claddinglist_l1", "envi_export_concretelist_l1", "envi_export_metallist_l1", "envi_export_stonelist_l1", "envi_export_woodlist_l1", "envi_export_gaslist_l1", "envi_export_insulationlist_l1")[int(cm.envi_layer1to)])
-                            row = layout.row()
-                            row.prop(cm, "envi_export_l1_thi")
-                    elif cm.envi_layer1 == '2' and cm.envi_con_type != 'Window':
+                    if cm.envi_layero == '1':
+                        newrow(layout, "Outer layer type:", cm, "envi_type_lo")
+                        newrow(layout, "Outer layer material:", cm, "envi_material_lo")
+                        newrow(layout, "Outer layer thickness:", cm, "envi_export_lo_thi")
+                            
+                    elif cm.envi_layero == '2' and cm.envi_con_type != 'Window':
                         for end in ('name', 0, 'thi', 'tc', 0, 'rho', 'shc', 0, 'tab', 'sab', 0, 'vab', 'rough'):
                             if end:
-                                row.prop(cm, '{}{}'.format("envi_export_l1_", end))  
+                                row.prop(cm, '{}{}'.format("envi_export_lo_", end))
                             else:
                                 row = layout.row()
-
-                    elif cm.envi_layer1 == '2' and cm.envi_con_type == 'Window':
-                        row.prop(cm, "envi_export_l1_name")
-                        newrow(layout, "Gas Type:", cm, "envi_export_wgaslist_l1")
-                        row.prop(cm, "envi_export_l1_thi")
-
-                    if cm.envi_layer1 != '0':
-                        row = layout.row()
-                        row.label("3rd layer:")
-                        row.prop(cm, "envi_layer2")
-                        if cm.envi_layer2 == '1':
-                            if cm.envi_con_type == "Window":
-                                newrow(layout, "Glass Type:", cm, ("envi_export_glasslist_l2"))
-                            elif cm.envi_con_type in ("Wall", "Roof", "Floor", "Door"):
-                                newrow(layout, "3rd layer type:", cm, "envi_layer2to")
-                                newrow(layout, "3rd layer cm:", cm, ("envi_export_bricklist_l2", "envi_export_claddinglist_l2", "envi_export_concretelist_l2", "envi_export_metallist_l2", "envi_export_stonelist_l2", "envi_export_woodlist_l2", "envi_export_gaslist_l2", "envi_export_insulationlist_l2")[int(cm.envi_layer2to)])
+                        if cm.envi_type_lo == '8':
+                            newrow(layout, "TCTC:", cm, "envi_tctc_lo")
+                            newrow(layout, "Temps:Enthalpies:", cm, "envi_tempsemps_lo")
+    
+                    elif cm.envi_layero == '2' and cm.envi_con_type == 'Window':
+                        newrow(layout, "Name:", cm, "envi_export_lo_name")
+                        newrow(layout, "Optical data type:", cm, "envi_export_lo_odt")
+                        newrow(layout, "Construction Make-up:", cm, "envi_export_lo_sds")
+                        newrow(layout, "Translucent:", cm, "envi_export_lo_sdiff")
+                        for end in (0, 'thi', 'tc', 0, 'stn', 'fsn', 'bsn', 0, 'vtn', 'fvrn', 'bvrn', 0, 'itn', 'fie', 'bie'):
+                            if end:
+                                row.prop(cm, '{}{}'.format("envi_export_lo_", end))
+                            else:
                                 row = layout.row()
-                                row.prop(cm, "envi_export_l2_thi")
-
-                        elif cm.envi_layer2 == '2'and cm.envi_con_type != 'Window':
+    
+                    if cm.envi_layero != '0':
+                        row = layout.row()
+                        row.label("----------------")
+                        newrow(layout, "2nd layer:", cm, "envi_layer1")
+                        row = layout.row()
+                        if cm.envi_layer1 == '1':
+                            newrow(layout, "Second layer type:", cm, "envi_type_l1")
+                            newrow(layout, "Second layer material:", cm, "envi_material_l1")
+                            newrow(layout, "Second layer thickness:", cm, "envi_export_l1_thi")
+                        
+                        elif cm.envi_layer1 == '2' and cm.envi_con_type != 'Window':
                             for end in ('name', 0, 'thi', 'tc', 0, 'rho', 'shc', 0, 'tab', 'sab', 0, 'vab', 'rough'):
                                 if end:
-                                    row.prop(cm, '{}{}'.format("envi_export_l2_", end))  
-                                else: 
-                                    row = layout.row()
-
-                        elif cm.envi_layer2 == '2' and cm.envi_con_type == 'Window':
-                            for end in ('name', 0, 'thi', 'tc', 0, 'odt', 'sds', 0, 'stn', 'fsn', 'bsn', 0, 'vtn', 'fvrn', 'bvrn', 0, 'itn', 'fie', 'bie'):
-                                if end:
-                                    row.prop(cm, '{}{}'.format("envi_export_l2_", end))  
+                                    row.prop(cm, '{}{}'.format("envi_export_l1_", end))
                                 else:
                                     row = layout.row()
-
-                        if cm.envi_layer2 != '0':
+                            
+                            if cm.envi_type_l1 == '8':
+                                newrow(layout, "TCTC:", cm, "envi_tctc_l1")
+                                newrow(layout, "Temps:Enthalpies:", cm, "envi_tempsemps_l1")
+    
+                        elif cm.envi_layer1 == '2' and cm.envi_con_type == 'Window':
+                            newrow(layout, "Name:", cm, "envi_export_l1_name")
+                            newrow(layout, "Gas Type:", cm, "envi_export_wgaslist_l1")
+                            newrow(layout, "Gas thickness:", cm, "envi_export_l1_thi")
+    
+                        if cm.envi_layer1 != '0':
                             row = layout.row()
-                            row.label("4th layer:")
-                            row.prop(cm, "envi_layer3")
+                            row.label("----------------")
                             row = layout.row()
-                            if cm.envi_layer3 == '1':
-                                if cm.envi_con_type == "Window":
-                                    row.label("Gas Type:")
-                                    row.prop(cm, ("envi_export_wgaslist_l3"))
-                                    row.prop(cm, "envi_export_l3_thi")
-                                elif cm.envi_con_type in ("Wall", "Roof", "Floor", "Door"):
-                                    row.label("4th layer type:")
-                                    row.prop(cm, "envi_layer3to")
-                                    row = layout.row()
-                                    row.label("4th layer cm:")
-                                    row.prop(cm, ("envi_export_bricklist_l3", "envi_export_claddinglist_l3", "envi_export_concretelist_l3", "envi_export_metallist_l3", "envi_export_stonelist_l3", "envi_export_woodlist_l3", "envi_export_gaslist_l3", "envi_export_insulationlist_l3")[int(cm.envi_layer3to)])
-                                    row = layout.row()
-                                    row.prop(cm, "envi_export_l3_thi")
-
-                            elif cm.envi_layer3 == '2'and cm.envi_con_type != 'Window':
+                            row.label("3rd layer:")
+                            row.prop(cm, "envi_layer2")
+                            if cm.envi_layer2 == '1':
+                                newrow(layout, "Third layer type:", cm, "envi_type_l2")
+                                newrow(layout, "Third layer material:", cm, "envi_material_l2")
+                                newrow(layout, "Third layer thickness:", cm, "envi_export_l2_thi")
+    
+                            elif cm.envi_layer2 == '2'and cm.envi_con_type != 'Window':
                                 for end in ('name', 0, 'thi', 'tc', 0, 'rho', 'shc', 0, 'tab', 'sab', 0, 'vab', 'rough'):
                                     if end:
-                                        row.prop(cm, '{}{}'.format("envi_export_l3_", end))  
+                                        row.prop(cm, '{}{}'.format("envi_export_l2_", end))
                                     else:
                                         row = layout.row()
-
-                            elif cm.envi_layer3 == '2' and cm.envi_con_type == 'Window':
-                                row.prop(cm, "envi_export_l1_name")
-                                row = layout.row()
-                                row.label("Gas Type:")
-                                row.prop(cm, "envi_export_wgaslist_l3")
-                                row.prop(cm, "envi_export_l3_thi")
-
-                            if cm.envi_layer3 != '0':
-                                row = layout.row()
-                                row.label("5th layer:")
-                                row.prop(cm, "envi_layer4")
-                                row = layout.row()
-                                if cm.envi_layer4 == '1':
-                                    if cm.envi_con_type == "Window":
-                                        row.label("Glass Type:")
-                                        row.prop(cm, ("envi_export_glasslist_l4"))
-                                    elif cm.envi_con_type in ("Wall", "Roof", "Floor", "Door"):
-                                        row.label("5th layer type:")
-                                        row.prop(cm, "envi_layer4to")
+                                        
+                                if cm.envi_type_l2 == '8':
+                                    newrow(layout, "TCTC:", cm, "envi_tctc_l2")
+                                    newrow(layout, "Temps:Enthalpies:", cm, "envi_tempsemps_l2")
+    
+                            if cm.envi_layer2 == '2' and cm.envi_con_type == 'Window':
+                                newrow(layout, "Name:", cm, "envi_export_l2_name")
+                                newrow(layout, "Optical data type:", cm, "envi_export_l2_odt")
+                                newrow(layout, "Construction Make-up:", cm, "envi_export_l2_sds")
+                                newrow(layout, "Translucent:", cm, "envi_export_l2_sdiff")
+                                for end in (0, 'thi', 'tc', 0, 'stn', 'fsn', 'bsn', 0, 'vtn', 'fvrn', 'bvrn', 0, 'itn', 'fie', 'bie'):
+                                    if end:
+                                        row.prop(cm, '{}{}'.format("envi_export_l2_", end))
+                                    else:
                                         row = layout.row()
-                                        row.label("5th layer cm:")
-                                        row.prop(cm, ("envi_export_bricklist_l4", "envi_export_claddinglist_l4", "envi_export_concretelist_l4", "envi_export_metallist_l4", "envi_export_stonelist_l4", "envi_export_woodlist_l4", "envi_export_gaslist_l4", "envi_export_insulationlist_l4")[int(cm.envi_layer4to)])
-                                        row = layout.row()
-                                        row.prop(cm, "envi_export_l4_thi")
-
-                                elif cm.envi_layer4 == '2' and cm.envi_con_type != 'Window':
+    
+                            if cm.envi_layer2 != '0':
+                                row = layout.row()
+                                row.label("----------------")
+                                row = layout.row()
+                                row.label("4th layer:")
+                                row.prop(cm, "envi_layer3")
+                                row = layout.row()
+                                if cm.envi_layer3 == '1':
+                                    newrow(layout, "Fourth layer type:", cm, "envi_type_l3")
+                                    newrow(layout, "Fourth layer material:", cm, "envi_material_l3")
+                                    newrow(layout, "Fourth layer thickness:", cm, "envi_export_l3_thi")
+    
+                                elif cm.envi_layer3 == '2'and cm.envi_con_type != 'Window':
                                     for end in ('name', 0, 'thi', 'tc', 0, 'rho', 'shc', 0, 'tab', 'sab', 0, 'vab', 'rough'):
                                         if end:
-                                            row.prop(cm, '{}{}'.format("envi_export_l4_", end))  
+                                            row.prop(cm, '{}{}'.format("envi_export_l3_", end))
                                         else:
                                             row = layout.row()
+                                    
+                                    if cm.envi_type_l3 == '8':
+                                        newrow(layout, "TCTC:", cm, "envi_tctc_l3")
+                                        newrow(layout, "Temps:Enthalpies:", cm, "envi_tempsemps_l3")
+    
+                                elif cm.envi_layer3 == '2' and cm.envi_con_type == 'Window':
+                                    newrow(layout, "Name:", cm, "envi_export_l3_name")
+                                    row = layout.row()
+                                    row.label("Gas Type:")
+                                    row.prop(cm, "envi_export_wgaslist_l3")
+                                    newrow(layout, "3rd layer thickness:", cm, "envi_export_l3_thi")
+    
+                                if cm.envi_layer3 != '0':
+                                    row = layout.row()
+                                    row.label("----------------")
+                                    row = layout.row()
+                                    row.label("5th layer:")
+                                    row.prop(cm, "envi_layer4")
+                                    row = layout.row()
+                                    if cm.envi_layer4 == '1':
+                                        newrow(layout, "Fifth layer type:", cm, "envi_type_l4")
+                                        newrow(layout, "Fifth layer material:", cm, "envi_material_l4")
+                                        newrow(layout, "Fifth layer thickness:", cm, "envi_export_l4_thi")
+    
+                                    elif cm.envi_layer4 == '2' and cm.envi_con_type != 'Window':
+                                        for end in ('name', 0, 'thi', 'tc', 0, 'rho', 'shc', 0, 'tab', 'sab', 0, 'vab', 'rough'):
+                                            if end:
+                                                row.prop(cm, '{}{}'.format("envi_export_l4_", end))
+                                            else:
+                                                row = layout.row()
+                                        
+                                        if cm.envi_type_l4 == '8':
+                                            newrow(layout, "TCTC:", cm, "envi_tctc_l4")
+                                            newrow(layout, "Temps:Enthalpies:", cm, "envi_tempsemps_l4")
+    
+                                    elif cm.envi_layer4 == '2' and cm.envi_con_type == 'Window':
+                                        newrow(layout, "Name:", cm, "envi_export_l4_name")
+                                        newrow(layout, "Optical data type:", cm, "envi_export_l4_odt")
+                                        newrow(layout, "Construction Make-up:", cm, "envi_export_l4_sds")
+                                        newrow(layout, "Translucent:", cm, "envi_export_l4_sdiff")
+                                        for end in (0, 'thi', 'tc', 0, 'stn', 'fsn', 'bsn', 0, 'vtn', 'fvrn', 'bvrn', 0, 'itn', 'fie', 'bie'):
+                                            if end:
+                                                row.prop(cm, '{}{}'.format("envi_export_l4_", end))
+                                            else:
+                                                row = layout.row()
+    
+                elif cm.envi_con_makeup == '0':
+                    thicklist = ("envi_export_lo_thi", "envi_export_l1_thi", "envi_export_l2_thi", "envi_export_l3_thi", "envi_export_l4_thi")
+                    row = layout.row()                
+                    row.prop(cm, 'envi_con_list')
 
-                                elif cm.envi_layer4 == '2' and cm.envi_con_type == 'Window':
-                                    for end in ('name', 0, 'thi', 'tc', 0, 'odt', 'sds', 0, 'stn', 'fsn', 'bsn', 0, 'vtn', 'fvrn', 'bvrn', 0, 'itn', 'fie', 'bie'):
-                                        if end:
-                                            row.prop(cm, '{}{}'.format("envi_export_l4_", end)) 
-                                        else:
-                                            row = layout.row()
-
-            elif cm.envi_con_makeup == '0':
-                thicklist = ("envi_export_lo_thi", "envi_export_l1_thi", "envi_export_l2_thi", "envi_export_l3_thi", "envi_export_l4_thi")
-                row = layout.row()
-                if cm.envi_con_type == 'Wall':
-                    row.prop(cm, "envi_export_wallconlist")
-                    row = layout.row()
-                    for l, layername in enumerate(envi_cons.wall_con[cm.envi_export_wallconlist]):
-                        row.label(text = layername)
-                        if layername not in envi_mats.gas_dat:
-                            row.prop(cm, thicklist[l])
-                            row.label(text = "default: "+str(envi_mats.matdat[layername][7])+"mm")
+                    for l, layername in enumerate(envi_cons.propdict[cm.envi_con_type][cm.envi_con_list]):    
                         row = layout.row()
+                        row.label(text = layername)
+                        if layername in envi_mats.wgas_dat:
+                            row.prop(cm, thicklist[l])
+                            row.label(text = "default: 14mm")
+                        elif layername in envi_mats.gas_dat:
+                            row.prop(cm, thicklist[l])
+                            row.label(text = "default: 20-50mm")
+                        elif layername in envi_mats.glass_dat:
+                            row.prop(cm, thicklist[l])
+                            row.label(text = "default: {}mm".format(float(envi_mats.matdat[layername][3])*1000))
+                        else:
+                            row.prop(cm, thicklist[l])
+                            row.label(text = "default: {}mm".format(envi_mats.matdat[layername][7]))
+        
+        elif cm.mattype == '1':  
+            if scene.get('viparams') and scene['viparams'].get('viexpcontext') and scene['viparams']['viexpcontext'] == 'LiVi Compliance':
+                connode = bpy.data.node_groups[scene['viparams']['connode'].split('@')[1]].nodes[scene['viparams']['connode'].split('@')[0]]
+                coptions = connode['Options']
+
+                if coptions['canalysis'] == '0':
+                    if coptions['bambuild'] == '2':
+                        newrow(layout, "Space type:", cm, 'hspacemenu')
+                    elif coptions['bambuild'] == '3':
+                        newrow(layout, "Space type:", cm, 'brspacemenu')
+                        if cm.brspacemenu == '2':
+                            row = layout.row()
+                            row.prop(cm, 'gl_roof')
+                    elif coptions['bambuild'] == '4':
+                        newrow(layout, "Space type:", cm, 'respacemenu')
+                elif coptions['canalysis'] == '1':
+                    newrow(layout, "Space type:", cm, 'crspacemenu')
+                elif coptions['canalysis'] == '2':
+                    if coptions['bambuild'] == '2':
+                        newrow(layout, "Space type:", cm, 'hspacemenu')
+                    if coptions['bambuild'] == '3':
+                        newrow(layout, "Space type:", cm, 'brspacemenu')
+#                    elif coptions['canalysis'] == '3':
+#                        newrow(layout, "Space type:", cm, 'lespacemenu')                   
+            rmmenu(layout, cm)
+        
+        elif cm.mattype == '2':
+            fvsimnode = bpy.data.node_groups[scene['viparams']['fvsimnode'].split('@')[1]].nodes[scene['viparams']['fvsimnode'].split('@')[0]] if 'fvsimnode' in scene['viparams'] else 0
+            newrow(layout, "Type:", cm, "flovi_bmb_type")
+            if cm.flovi_bmb_type == '0':
+                newrow(layout, "Pressure type:", cm, "flovi_bmwp_type")
+                if cm.flovi_bmwp_type == 'fixedValue':
+                    newrow(layout, "Pressure value:", cm, "flovi_b_sval")
+                    
+                newrow(layout, "Velocity type:", cm, "flovi_bmwu_type")
+                newrow(layout, "Field value:", cm, "flovi_u_field")
+                if not cm.flovi_u_field:
+                    newrow(layout, 'Velocity:', cm, 'flovi_b_vval')
+#                split = layout.split()
+#                col = split.column(align=True)
+#                col.label(text="Velocity:")
+#                col.prop(cm, "flovi_bmu_x")
+#                col.prop(cm, "flovi_bmu_y")
+#                col.prop(cm, "flovi_bmu_z")
                 
-                elif cm.envi_con_type == 'Floor':
-                    row.prop(cm, "envi_export_floorconlist")
-                    row = layout.row()
-                    for l, layername in enumerate(envi_cons.floor_con[cm.envi_export_floorconlist]):
-                        row.label(text = layername)
-                        if layername not in envi_mats.gas_dat:
-                            row.prop(cm, thicklist[l])
-                            row.label(text = "default: "+str(envi_mats.matdat[layername][7])+"mm")
-                        row = layout.row()
-
-                elif cm.envi_con_type == 'Roof':
-                    row.prop(cm, "envi_export_roofconlist")
-                    row = layout.row()
-                    for l, layername in enumerate(envi_cons.roof_con[cm.envi_export_roofconlist]):
-                        row.label(text = layername)
-                        if layername not in envi_mats.gas_dat:
-                            row.prop(cm, thicklist[l])
-                            row.label(text = "default: "+str(envi_mats.matdat[layername][7])+"mm")
-                        row = layout.row()
-
-                elif cm.envi_con_type == 'Door':
-                    row.prop(cm, "envi_export_doorconlist")
-                    row = layout.row()
-                    for l, layername in enumerate(envi_cons.door_con[cm.envi_export_doorconlist]):
-                        row.label(text = layername)
-#                        if layername not in envi_mats.door_dat:
-                        row.prop(cm, thicklist[l])
-                        row.label(text = "default: "+str(envi_mats.matdat[layername][7])+"mm")
-                        row = layout.row()
-
-                elif cm.envi_con_type == 'Window':
-                    row.prop(cm, "envi_export_glazeconlist")
-
-class IESPanel(bpy.types.Panel):
-    bl_label = "LiVi IES file"
+                if fvsimnode and fvsimnode.solver != 'icoFoam':
+                    newrow(layout, "nut type:", cm, "flovi_bmwnut_type")
+                    if fvsimnode.turbulence == 'SpalartAllmaras':                        
+                        newrow(layout, "nuTilda type:", cm, "flovi_bmwnutilda_type")
+                    elif fvsimnode.turbulence == 'kEpsilon':
+                        newrow(layout, "k type:", cm, "flovi_bmwk_type")
+                        newrow(layout, "Epsilon type:", cm, "flovi_bmwe_type")
+                    elif fvsimnode.turbulence == 'komega':
+                        newrow(layout, "k type:", cm, "flovi_bmwk_type")
+                        newrow(layout, "Omega type:", cm, "flovi_bmwe_type")
+                    if fvsimnode.bouyancy:
+                        newrow(layout, "Temperature:", cm, "temperature")
+#                newrow(layout, "nuTilda:", cm, "flovi_bmnutilda")
+#                split = layout.split()
+#                col = split.column(align=True)
+#                col.label(text="nuTilda:")
+#                col.prop(cm, "flovi_bmnut")
+#                col.prop(cm, "flovi_bmwnut_y")
+#                col.prop(cm, "flovi_bmwnut_z")
+            elif cm.flovi_bmb_type == '1':
+                newrow(layout, "Pressure sub-type:", cm, "flovi_bmip_type")
+                if cm.flovi_bmip_type == 'fixedValue':
+                    newrow(layout, "Pressure value:", cm, "flovi_b_sval")
+                newrow(layout, "Velocity sub-type:", cm, "flovi_bmiu_type")
+                newrow(layout, "Field value:", cm, "flovi_u_field")
+                if not cm.flovi_u_field:
+                    newrow(layout, 'Velocity:', cm, 'flovi_b_vval')
+                if fvsimnode and fvsimnode.solver != 'icoFoam':
+                    newrow(layout, "nut type:", cm, "flovi_bminut_type")
+                    if fvsimnode.turbulence == 'SpalartAllmaras':                        
+                        newrow(layout, "nuTilda type:", cm, "flovi_bminutilda_type")
+                    elif fvsimnode.turbulence == 'kEpsilon':
+                        newrow(layout, "k type:", cm, "flovi_bmik_type")
+                        newrow(layout, "Epsilon type:", cm, "flovi_bmie_type")
+                    elif fvsimnode.turbulence == 'kOmega':
+                        newrow(layout, "k type:", cm, "flovi_bmik_type")
+                        newrow(layout, "Omega type:", cm, "flovi_bmio_type")
+            elif cm.flovi_bmb_type == '2':
+                newrow(layout, "Pressure sub-type:", cm, "flovi_bmop_type")
+                if cm.flovi_bmop_type == 'fixedValue':
+                    newrow(layout, "Pressure value:", cm, "flovi_b_sval")
+                newrow(layout, "Velocity sub-type:", cm, "flovi_bmou_type")
+                newrow(layout, "Field value:", cm, "flovi_u_field")
+                if not cm.flovi_u_field:
+                    newrow(layout, 'Velocity:', cm, 'flovi_b_vval')
+                if fvsimnode and fvsimnode.solver != 'icoFoam':
+                    newrow(layout, "nut type:", cm, "flovi_bmonut_type")
+                    if fvsimnode.turbulence == 'SpalartAllmaras':                        
+                        newrow(layout, "nuTilda type:", cm, "flovi_bmonutilda_type")
+                    elif fvsimnode.turbulence == 'kEpsilon':
+                        newrow(layout, "k type:", cm, "flovi_bmok_type")
+                        newrow(layout, "Epsilon type:", cm, "flovi_bmoe_type")
+                    elif fvsimnode.turbulence == 'kOmega':
+                        newrow(layout, "k type:", cm, "flovi_bmok_type")
+                        newrow(layout, "Omega type:", cm, "flovi_bmoo_type")
+                
+#class IESPanel(bpy.types.Panel):
+#    bl_label = "VI Object Properties"
+#    bl_space_type = "PROPERTIES"
+#    bl_region_type = "WINDOW"
+#    bl_context = "data"
+#    
+#    @classmethod
+#    def poll(cls, context):
+#        if context.lamp or context.mesh:
+#            return True
+#
+#    def draw(self, context):
+#        layout, lamp = self.layout, context.active_object
+#        if context.mesh: 
+#            newrow(layout, 'Light Array', lamp, 'lila')
+#        if (lamp.type == 'LAMP' and lamp.data.type != 'SUN') or lamp.lila: 
+#            row = layout.row()
+#            row.operator("livi.ies_select")
+#            row.prop(lamp, "ies_name")
+#            newrow(layout, 'IES Dimension:', lamp, "ies_unit")
+#            newrow(layout, 'IES Strength:', lamp, "ies_strength")
+#            row = layout.row()
+#            row.prop(lamp, "ies_colour")
+                
+class VIObPanel(bpy.types.Panel):
+    bl_label = "VI-Suite Object Definition"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "data"
 
     @classmethod
     def poll(cls, context):
-        if context.lamp or 'lightarray' in context.object.name:
+        if context.object and context.object.type in ('LAMP', 'MESH'):
             return True
 
     def draw(self, context):
-        layout, lamp = self.layout, context.active_object
-        row = layout.row()
-        row.operator("livi.ies_select")
-        row.prop(lamp, "ies_name")
-        newrow(layout, 'IES Dimension:', lamp, "ies_unit")
-        newrow(layout, 'IES Strength:', lamp, "ies_strength")
-        row = layout.row()
-        row.prop(lamp, "ies_colour")
-
-class EnZonePanel(bpy.types.Panel):
-    bl_label = "EnVi Zone Definition"
-    bl_space_type = "PROPERTIES"
-    bl_region_type = "WINDOW"
-    bl_context = "object"
-
-    @classmethod
-    def poll(cls, context):
-        if context.object and context.object.type == 'MESH':
-            return len(context.object.data.materials)
-
-    def draw(self, context):
-        object = bpy.context.active_object
+        obj = context.active_object
         layout = self.layout
-        row = layout.row()
-        row.prop(object, "envi_type")
-        row = layout.row()
-        if object.envi_type == '1':
-            newrow(layout, 'Heating:', object, "envi_heats1c")
+#        if obj.type in ('LAMP', 'MESH'):
+        if obj.type == 'MESH':
             row = layout.row()
-            row.prop(object, "envi_heats1")
-            if object.envi_heats1 == True:
-                for end in ('d', 0, 'p1st', 'p1et', 'sp1', 0, 'p2st', 'p2et', 'sp2', 0, 'p3st', 'p3et', 'sp3'):
-                    if end:
-                        row.prop(object, '{}{}'.format("envi_heats1", end))  
-                    else:
-                        row = layout.row()
-                if object.envi_heats1d != "0":
-                    row = layout.row()
-                    row.prop(object, "envi_heats2")
-                    if object.envi_heats2 == True:
-                        if object.envi_heats1d == "1":
-                            row.prop(object, "envi_heats2dwe")
-                        else:
-                            row.prop(object, "envi_heats2dwd")
-                        for end in (0, 'p1st', 'p1et', 'sp1', 0, 'p2st', 'p2et', 'sp2', 0, 'p3st', 'p3et', 'sp3'):
-                            if end:
-                                row.prop(object, '{}{}'.format("envi_heats2", end))  
-                            else:
-                                row = layout.row()
-
-            row = layout.row()
-            row.label('-------------------------------------')
-
-            row = layout.row()
-            row.label('Cooling:')
-            row.prop(object, "envi_cools1c")
-            row = layout.row()
-            row.prop(object, "envi_cools1")
-
-            if object.envi_cools1 == True:
-                for end in ('s1d', 0, 'p1st', 'p1et', 'sp1', 0, 'p2st', 'p2et', 'sp2', 0, 'p3st', 'p3et', 'sp3'):
-                    if end:
-                        row.prop(object, '{}{}'.format("envi_cools1", end))  
-                    else:
-                        row = layout.row()
-
-                if object.envi_cools1d != "0":
-                    row = layout.row()
-                    row.prop(object, "envi_cools2")
-                    if object.envi_cools2 == True:
-                        if object.envi_cools1d == "1":
-                            row.prop(object, "envi_cools2dwe")
-                        else:
-                            row.prop(object, "envi_cools2dwd")
-                        for end in (0, 'p1st', 'p1et', 'sp1', 0, 'p2st', 'p2et', 'sp2', 0, 'p3st', 'p3et', 'sp3'):
-                            if end:
-                                row.prop(object, '{}{}'.format("envi_cools2", end))  
-                            else:
-                                row = layout.row()
-
-            row = layout.row()
-            row.label('------------------------------------------------------------')
-
-            row = layout.row()
-            row.label('Occupancy:')
-            row.prop(object, "envi_occtype")
-            if object.envi_occtype != "0":
-                for end in ('max', '1d', 0, '1p1st', '1p1et', '1p1level', 0, '1p2st', '1p2et', '1p2level', 0, '1p3st', '1p3et', '1p3level', 0, '1watts'):
-                    if end:
-                        row.prop(object, '{}{}'.format("envi_occs", end))  
-                    else:
-                        row = layout.row()
+            row.prop(obj, "vi_type")
+            if obj.vi_type == '1':
                 row = layout.row()
-                if object.envi_occs1d != "0":
-                    row.prop(object, "envi_occs2")
-                    if object.envi_occs2 == True:
-                        if object.envi_occs1d == "1":
-                            row.prop(object, "envi_occs2dwe")
-                        else:
-                            row.prop(object, "envi_occs2dwd")
-                        for end in ('2p1st', '2p1et', '2p1level', 0, '2p2st', '2p2et', '2p2level', 0, '2p3st', '2p3et', '2p3level', 0, '2watts'):
-                            if end:
-                                row.prop(object, '{}{}'.format("envi_occs", end))  
-                            else:
-                                row = layout.row()
+                row.prop(obj, "envi_type")
+                if obj.envi_type == '0':
+                    newrow(layout, 'Inside convection:', obj, "envi_ica")
+                    newrow(layout, 'Outside convection:', obj, "envi_oca")
+                    
 
+        if (obj.type == 'LAMP' and obj.data.type != 'SUN') or obj.vi_type == '4':
             row = layout.row()
-            row.label('---------------------------------------------------------')
+            row.operator("livi.ies_select")
+            row.prop(obj, "ies_name")
+            newrow(layout, 'IES Dimension:', obj, "ies_unit")
+            newrow(layout, 'IES Strength:', obj, "ies_strength")
+            row = layout.row()
+            row.prop(obj, "ies_colour")
 
-            row = layout.row()
-            row.label('Infiltration:')
-            if object.envi_occtype != "0":
-                row.prop(object, "envi_occinftype")
+        elif obj.vi_type == '5':                
+            newrow(layout, 'Direction:', obj, 'li_bsdf_direc')
+            newrow(layout, 'Klems/Tensor:', obj, 'li_bsdf_tensor')
+            if obj.li_bsdf_tensor != ' ':
+                newrow(layout, 'resolution:', obj, 'li_bsdf_res')
+                newrow(layout, 'Samples:', obj, 'li_bsdf_tsamp')
             else:
-                row.prop(object, "envi_inftype")
-            row.prop(object, "envi_inflevel")
-            if object.envi_occinftype == "1" and object.envi_occtype != "0":
-                newrow(layout, 'Base Infiltration:', object, "envi_infbasetype")
-                row.prop(object, "envi_infbaselevel")
+                newrow(layout, 'Samples:', obj, 'li_bsdf_ksamp')
+            newrow(layout, 'RC params:', obj, 'li_bsdf_rcparam')
+            row = layout.row()
+#                col = row.column()
+            
 
-#
-#class EnMatPanel(bpy.types.Panel):
+            row.operator("material.gen_bsdf", text="Generate BSDF")
+
+            if obj.get('bsdf'):
+#                    row = layout.row()
+#                    row.label('Delete BSDF')
+                row.operator("material.del_bsdf", text="Delete BSDF")
+            newrow(layout, 'Proxy:', obj, 'bsdf_proxy')
+
+def rmmenu(layout, cm):
+    row = layout.row()
+    row.label('LiVi Radiance type:')
+    row.prop(cm, 'radmatmenu')
+    row = layout.row()
+
+    for prop in cm.radmatdict[cm.radmatmenu]:
+        if prop:
+             row.prop(cm, prop)
+        else:
+            row = layout.row()
+            
+    if cm.radmatmenu == '8':
+        row.operator("material.load_bsdf", text="Load BSDF")
+    if cm.get('bsdf'):
+        row.operator("material.del_bsdf", text="Delete BSDF")
+        row = layout.row()
+        row.operator("material.save_bsdf", text="Save BSDF")
+
+    newrow(layout, 'Photon Port:', cm, 'pport')
+    row = layout.row()
+    row.label("-----------------------------------------")

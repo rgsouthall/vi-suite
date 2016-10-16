@@ -16,622 +16,166 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-import bpy, os, subprocess, colorsys, datetime
-from math import pi
-from subprocess import PIPE, Popen, STDOUT
-from . import vi_func
+import bpy, os, datetime
+from subprocess import Popen, PIPE
+from time import sleep
 from . import livi_export
-
-try:
-    import numpy
-    np = 1
-except:
-    np = 0
+from .vi_func import retpmap, selobj, progressbar, progressfile
 
 def radfexport(scene, export_op, connode, geonode, frames):
     for frame in frames:
         livi_export.fexport(scene, frame, export_op, connode, geonode, pause = 1)
 
-def rad_prev(prev_op, simnode, connode, geonode, simacc):    
-    scene = bpy.context.scene    
-    if os.path.isfile("{}-{}.rad".format(geonode.filebase, scene.frame_current)):
-        cam = scene.camera
-        if cam != None:
-            cang = '180 -vth' if connode.analysismenu == '3' else cam.data.angle*180/pi
-            vv = 180 if connode.analysismenu == '3' else cang * scene.render.resolution_y/scene.render.resolution_x
-            rvucmd = "rvu -w -n {0} -vv {1} -vh {2} -vd {3[0][2]:.3f} {3[1][2]:.3f} {3[2][2]:.3f} -vp {4[0]:.3f} {4[1]:.3f} {4[2]:.3f} {5} {6}-{7}.oct &".format(geonode.nproc, vv, cang, -1*cam.matrix_world, cam.location, simnode['radparams'], geonode.filebase, scene.frame_current)
-            rvurun = Popen(rvucmd, shell = True, stdout=PIPE, stderr=STDOUT)
-            for l,line in enumerate(rvurun.stdout):            
-                if 'octree' in line.decode() or 'mesh' in line.decode():
-                    prev_op.report({'ERROR'}, "Something wrong with the Radiance input files. Try rerunning the geometry and context export")
-                    return
-        else:
-            prev_op.report({'ERROR'}, "There is no camera in the scene. Radiance preview will not work")
-    else:
-        prev_op.report({'ERROR'},"Missing export file. Make sure you have exported the scene or that the current frame is within the exported frame range.")
-
-def li_calc(calc_op, simnode, connode, geonode, simacc, **kwargs): 
+def li_calc(calc_op, simnode, simacc, **kwargs): 
     scene = bpy.context.scene
-    frames = range(scene.fs, scene.fe + 1) if not kwargs.get('genframe') else [kwargs['genframe']]
-    os.chdir(geonode.newdir)
-    if bpy.context.active_object and bpy.context.active_object.mode != 'OBJECT':
-        bpy.ops.object.mode_set(mode = 'OBJECT')
-    if os.lstat(geonode.filebase+".rtrace").st_size == 0:
-        calc_op.report({'ERROR'},"There are no materials with the livi sensor option enabled")
-    else:
-        if np == 1:
-            res, svres = numpy.zeros([len(frames), geonode['reslen']]), numpy.zeros([len(frames), geonode['reslen']])
-        else:
-            res, svres = [[[0 for p in range(geonode['reslen'])] for x in range(len(frames))] for x in range(2)]
-
-        for frame in frames:            
-            findex = frame - scene.fs if not kwargs.get('genframe') else 0
-            if connode.bl_label in ('LiVi Basic', 'LiVi Compliance') or (connode.bl_label == 'LiVi CBDM' and int(connode.analysismenu) < 2):
-                if os.path.isfile("{}-{}.af".format(geonode.filebase, frame)):
-                    subprocess.call("{} {}-{}.af".format(geonode.rm, geonode.filebase, frame), shell=True)
-                rtcmd = "rtrace -n {0} -w {1} -faa -h -ov -I {2}-{3}.oct  < {2}.rtrace {4}".format(geonode.nproc, simnode['radparams'], geonode.filebase, frame, connode['simalg']) #+" | tee "+lexport.newdir+lexport.fold+self.simlistn[int(lexport.metric)]+"-"+str(frame)+".res"
-                rtrun = Popen(rtcmd, shell = True, stdout=PIPE, stderr=STDOUT)
-                with open(os.path.join(geonode.newdir, connode['resname']+"-"+str(frame)+".res"), 'w') as resfile:
-                    for l,line in enumerate(rtrun.stdout):
-                        if 'octree' in line.decode() or 'mesh' in line.decode():
-                            print(line.decode() + ' rerunning export')
-                            resfile.close()
-                            radfexport(scene, calc_op, connode, geonode, frames)
-                            if kwargs.get('genframe'):
-                                res = li_calc(calc_op, simnode, connode, geonode, simacc, genframe = kwargs.get('genframe'))
-                                return(res)                                
-                            else:
-                                li_calc(calc_op, simnode, connode, geonode, simacc)
-                                return
-                        res[findex][l] = float(line.decode())
-                    resfile.write("{}".format(res).strip("]").strip("["))
-                
-            if connode.bl_label == 'LiVi Compliance' and connode.analysismenu in ('0', '1'):
-                if connode.analysismenu in ('0', '1'):
-                    svcmd = "rtrace -n {0} -w {1} -h -ov -I -af {2}-{3}.af {2}-{3}.oct  < {2}.rtrace {4}".format(geonode.nproc, '-ab 1 -ad 8192 -aa 0 -ar 512 -as 1024 -lw 0.0002', geonode.filebase, frame, connode['simalg']) #+" | tee "+lexport.newdir+lexport.fold+self.simlistn[int(lexport.metric)]+"-"+str(frame)+".res"
-                    svrun = Popen(svcmd, shell = True, stdout=PIPE, stderr=STDOUT)
-                    with open(os.path.join(geonode.newdir,'skyview'+"-"+str(frame)+".res"), 'w') as svresfile:
-                        for sv,line in enumerate(svrun.stdout):
-                            svres[findex][sv] = float(line.decode())
-                        svresfile.write("{}".format(svres[findex]).strip("]").strip("["))
-
-            if connode.bl_label == 'LiVi CBDM' and int(connode.analysismenu) > 1:
-                if connode.sourcemenu == '1':
-                    connode['vecvals'], vals = vi_func.mtx2vals(open(connode.mtxname, "r").readlines(), datetime.datetime(2010, 1, 1).weekday(), '')
-                hours = 0
-                sensarray = [[0 for x in range(146)] for y in range(geonode['reslen'])] if np == 0 else numpy.zeros([geonode['reslen'], 146])
-                oconvcmd = "oconv -w - > {0}-ws.oct".format(geonode.filebase)
-                Popen(oconvcmd, shell = True, stdin = PIPE, stdout=PIPE, stderr=STDOUT).communicate(input = (connode['whitesky']+geonode['radfiles'][frame]).encode('utf-8'))
-                senscmd = geonode.cat+geonode.filebase+".rtrace | rcontrib -w  -h -I -fo -bn 146 "+simnode['radparams']+" -n "+geonode.nproc+" -f tregenza.cal -b tbin -m sky_glow "+geonode.filebase+"-ws.oct"
-                sensrun = Popen(senscmd, shell = True, stdout=PIPE)
-
-                for li, line in enumerate(sensrun.stdout):
-                    decline = [float(ld) for ld in line.decode().split('\t') if ld != '\n']
-                    for v in range(0, 438, 3):
-                        if connode.analysismenu in ('2', '4'):
-                            sensarray[li][v/3] = 179*((decline[v]*0.265)+ (decline[v+1]*0.67) + (decline[v+2]*0.065))
-                        elif connode.analysismenu == '3':
-                            sensarray[li][v/3] = sum(decline[v:v+3])
-
-                for l, readings in enumerate(connode['vecvals']):
-                    if connode.analysismenu == '3' or (connode.cbdm_start_hour <= readings[:][0] < connode.cbdm_end_hour and readings[:][1] < connode['wd']):
-                        finalillu = [0 for x in range(geonode['reslen'])] if np == 0 else numpy.zeros((geonode['reslen']))
-                        for f, fi in enumerate(finalillu):
-                            finalillu[f] = numpy.sum([numpy.multiply(sensarray[f], readings[2:])]) if np == 1 else sum([a*b for a,b in zip(sensarray[f],readings[2:])])
-                        hours += 1
-
-                        if connode.analysismenu == '2':
-                            if np == 1:
-                                target = [reading >= connode.dalux for reading in finalillu]
-                                res[findex] = numpy.sum([res[findex], target], axis = 0)
-                            else:
-                                res[findex] = [res[findex][k] + (0, 1)[finalillu[k] >= connode.dalux] for k in range(len(finalillu))]
-
-                        elif connode.analysismenu == '3':
-                            if np ==1:
-                                if hours == 1:
-                                    reswatt = numpy.zeros((len(frames), len(connode['vecvals']), geonode['reslen'])) 
-                                reswatt[findex][l] = finalillu
-                                for i in range(len(finalillu)):
-                                    numpy.append(res[findex][i], finalillu[i])                                
-                            else:
-                                res[findex].append(finalillu)
-                            
-                        elif connode.analysismenu == '4':
-                            if np == 1:
-                                target = [connode.daauto >= reading >= connode.dasupp for reading in finalillu]
-                                res[findex] = numpy.sum([res[findex], target], axis = 0)
-                            else:
-                                res[findex] = [res[findex][k] + (0, 1)[connode.daauto >= finalillu[k] >= connode.dasupp] for k in range(len(finalillu))]
-                
-                if connode.analysismenu in ('2', '4'):
-                    if np == 1 and hours != 0:
-                        res[findex] = res[frame]*100/hours
-                    elif  np == 0 and hours != 0:
-                        res[findex] = [rf*100/hours for rf in res[findex][0]]
-                    with open(os.path.join(geonode.newdir, connode['resname']+"-"+str(frame)+".res"), "w") as daresfile:
-                        [daresfile.write("{:.2f}\n".format(r)) for r in res[findex]]
-                
-                if connode.analysismenu == '3':
-                    res = reswatt
-
-            if connode.analysismenu != '3' or connode.bl_label != 'LiVi CBDM':
-                fi, vi = 0, 0       
-                for geo in vi_func.retobjs('livic'):
-                    obcalcverts, obres, weightres, sensefaces = [], [], 0, [face for face in geo.data.polygons if geo.data.materials[face.material_index].livi_sense]
-                    geoarea = sum([vi_func.triarea(geo, face) for face in sensefaces])
-                    if not geoarea:
-                        calc_op.report({'INFO'}, geo.name+" has a livi sensor material associated with, but not assigned to any faces")
-                    else: 
-                        for face in sensefaces:
-                            if geonode.cpoint == '1':
-                                for v,vert in enumerate(face.vertices):
-                                    if geo.data.vertices[vert] not in obcalcverts:
-                                        weightres += res[findex][vi] 
-                                        obres.append(res[findex][vi])
-                                        obcalcverts.append(geo.data.vertices[vert])
-                                        vi += 1
-                            else:
-                                weightres += vi_func.triarea(geo, face) * res[findex][fi]/geoarea
-                                obres.append(res[findex][fi])
-                                fi += 1
-            
-                        if (frame == scene.fs and not kwargs.get('genframe')) or (kwargs.get('genframe') and kwargs['genframe'] == scene.frame_start):
-                            geo['oave'], geo['omax'], geo['omin'], geo['oreslist'] = {}, {}, {}, {}
+    pfs, epfs = [], []
+    context = simnode['coptions']['Context']
+    subcontext = simnode['coptions']['Type']
+    scene['liparams']['maxres'], scene['liparams']['minres'], scene['liparams']['avres'] = {}, {}, {}
+    frames = range(scene['liparams']['fs'], scene['liparams']['fe'] + 1) if not kwargs.get('genframe') else [kwargs['genframe']]
+    os.chdir(scene['viparams']['newdir'])
+    rtcmds, rccmds = [], []
+    builddict = {'0': ('School', 'Higher Education', 'Healthcare', 'Residential', 'Retail', 'Office & Other'), '2': ('School', 'Higher Education', 'Healthcare', 'Residential', 'Retail', 'Office & Other'), '3': ('Office/Education/Commercial', 'Healthcare')}
     
-                        geo['oave'][str(frame)] = weightres/(1, len(obcalcverts))[geonode.cpoint == '1'] 
-                        geo['omax'][str(frame)] = max(obres)
-                        geo['omin'][str(frame)] = min(obres)
-                        geo['oreslist'][str(frame)] = obres 
-                                   
-        if not kwargs:
-            
-            resapply(calc_op, res, svres, simnode, connode, geonode)
-            vi_func.vcframe('', scene, [ob for ob in scene.objects if ob.get('licalc')] , simnode['Animation'])
-        else:
-            return(res[0])
-   
-def resapply(calc_op, res, svres, simnode, connode, geonode):
-    scene = bpy.context.scene    
-    if connode.analysismenu != '3' or connode.bl_label != 'LiVi CBDM':
-        if np == 1:
-            simnode['maxres'] = list([numpy.amax(res[i]) for i in range(scene.fs, scene.fe + 1)])
-            simnode['minres'] = [numpy.amin(res[i]) for i in range(scene.fs, scene.fe + 1)]
-            simnode['avres'] = [numpy.average(res[i]) for i in range(scene.fs, scene.fe + 1)]
-        else:
-            simnode['maxres'] = [max(res[i]) for i in range(scene.fs, scene.fe + 1)]
-            simnode['minres'] = [min(res[i]) for i in range(scene.fs, scene.fe + 1)]
-            simnode['avres'] = [sum(res[i])/len(res[i]) for i in range(scene.fs, scene.fe + 1)]
-    
-        crits = []
-        dfpass = [0 for f in range(scene.fs, scene.fe + 1)]
-        edfpass = [0 for f in range(scene.fs, scene.fe + 1)]
-        
-        for fr, frame in enumerate(range(scene.fs, scene.fe + 1)):
-            scene.frame_set(frame)
-            fi = 0
-            dftotarea, dfpassarea, edfpassarea, edftotarea, mcol_i, fstart, fsv, sof, eof = 0, 0, 0, 0, 0, 0, 0, 0, 0
-            rgb, lcol_i = [], []
-            if connode.bl_label != 'LiVi CBDM' or connode.analysismenu != '3':
-                for i in range(len(res[fr])):
-                    h = 0.75*(1-(res[fr][i]-min(simnode['minres']))/(max(simnode['maxres']) + 0.01 - min(simnode['minres'])))
-                    rgb.append(colorsys.hsv_to_rgb(h, 1.0, 1.0))
-        
-            if bpy.context.active_object and bpy.context.active_object.hide == 'False':
-                bpy.ops.object.mode_set()
-        
-            for geo in vi_func.retobjs('livic'):
-                bpy.ops.object.select_all(action = 'DESELECT')
-                scene.objects.active = None
-                geoarea = sum([vi_func.triarea(geo, face) for face in geo.data.polygons if geo.data.materials[face.material_index].livi_sense])
-                geofaces = [face for face in geo.data.polygons if geo.data.materials[face.material_index].livi_sense]
-
-                if geo.get('wattres'):
-                    del geo['wattres']
+    for f, frame in enumerate(frames):
+        if context == 'Basic' or (context == 'CBDM' and subcontext == '0') or (context == 'Compliance' and int(subcontext) < 3):
+            if os.path.isfile("{}-{}.af".format(scene['viparams']['filebase'], frame)):
+                os.remove("{}-{}.af".format(scene['viparams']['filebase'], frame))
+            if simnode.pmap:
+                pmappfile = open(os.path.join(scene['viparams']['newdir'], 'viprogress'), 'w')
+                pmappfile.close()
+                errdict = {'fatal - too many prepasses, no global photons stored\n': "Too many prepasses have ocurred. Make sure light sources can see your geometry",
+                'fatal - too many prepasses, no global photons stored, no caustic photons stored\n': "Too many prepasses have ocurred. Turn off caustic photons and encompass the scene",
+               'fatal - zero flux from light sources\n': "No light flux, make sure there is a light source and that photon port normals point inwards",
+               'fatal - no light sources\n': "No light sources. Photon mapping does not work with HDR skies"}
+                amentry, pportentry, cpentry, cpfileentry = retpmap(simnode, frame, scene)
+                pmcmd = ('mkpmap -e {1}.pmapmom -bv+ +fo -apD 0.001 {0} -apg {1}-{2}.gpm {3} {4} {5} {1}-{2}.oct'.format(pportentry, scene['viparams']['filebase'], frame, simnode.pmapgno, cpentry, amentry))                   
+                pmrun = Popen(pmcmd.split(), stderr = PIPE, stdout = PIPE)
+                while pmrun.poll() is None:
+                    with open(os.path.join(scene['viparams']['newdir'], 'viprogress'), 'r') as pfile:
+                        if 'CANCELLED' in pfile.read():
+                            pmrun.kill()
+                            return 'CANCELLED'
+                        sleep(1)
+                        
+                with open('{}.pmapmon'.format(scene['viparams']['filebase']), 'r') as pmapfile:
+                    for line in pmapfile.readlines():
+                        if line in errdict:
+                            calc_op.report({'ERROR'}, errdict[line])
+                            return
+                    
+#                for line in pmrun.stdout: 
+#                    print(line)
+#                for line in pmrun.stderr: 
+#                    print(line)
+#                    if line.decode() in errdict:
+#                        calc_op.report({'ERROR'}, errdict[line.decode()])
+#                        return
                 
-                fend = fstart + len(geofaces)
-                passarea = 0
-                vi_func.selobj(scene, geo)
-                bpy.ops.mesh.vertex_color_add()
-                geo.data.vertex_colors[-1].name = str(frame)
-                vertexColour = geo.data.vertex_colors[-1]
-                mat = [matslot.material for matslot in geo.material_slots if matslot.material.livi_sense][0]
-                mcol_i = len(tuple(set(lcol_i)))
 
-                for face in [face for face in geo.data.polygons if geo.data.materials[face.material_index].livi_sense]:
-                    if geonode.cpoint == '1':
-                        cvtup = tuple(geo['cverts'])
-                        for loop_index in face.loop_indices:
-                            v = geo.data.loops[loop_index].vertex_index
-                            if v in cvtup:
-                                col_i = cvtup.index(v)
-                            lcol_i.append(col_i)
-                            vertexColour.data[loop_index].color = rgb[col_i+mcol_i]
-        
-                    if geonode.cpoint == '0':
-                        for loop_index in face.loop_indices:
-                            vertexColour.data[loop_index].color = rgb[fi]
-                        fi += 1
-
-                if connode.bl_label == 'LiVi Compliance':
-                    if connode.analysismenu == '1':
-                        bpy.ops.mesh.vertex_color_add()
-                        geo.data.vertex_colors[frame+1].name = '{}sv'.format(frame)
-                        vertexColour = geo.data.vertex_colors[frame+1]
-                        for face in geo.data.polygons:
-                            if geo.data.materials[face.material_index].livi_sense:
-                                if geonode.cpoint == '1':
-                                    cvtup = tuple(geo['cverts'])
-                                    for loop_index in face.loop_indices:
-                                        v = geo.data.loops[loop_index].vertex_index
-                                        if v in cvtup:
-                                            col_i = cvtup.index(v)
-                                        lcol_i.append(col_i)
-                                        vertexColour.data[loop_index].color = rgb[col_i+mcol_i]
-
-                                elif geonode.cpoint == '0':
-                                    for loop_index in face.loop_indices:
-                                        vertexColour.data[loop_index].color = (0, 1, 0) if svres[frame][fsv] > 0 else (1, 0, 0)
-                                    fsv += 1
-
-                    if fr == 0:
-                        crit, ecrit = [], []
-                        comps, ecomps =  [[[] * fra for fra in range(scene.fs, scene.fe + 1)] for x in range(2)]
-
-                        if connode.analysismenu == '0':
-                            ecrit = []
-                            if connode.bambuildmenu in ('0', '5'):
-                                if not mat.gl_roof:
-                                    crit.append(['Percent', 80, 'DF', 2, '1'])
-                                    crit.append(['Ratio', 100, 'Uni', 0.4, '0.5'])
-                                    crit.append(['Min', 100, 'PDF', 0.8, '0.5'])
-                                    crit.append(['Percent', 80, 'Skyview', 1, '0.75'])
-
-                                    if connode.buildstorey == '0':
-                                        ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 1.6, '0.75'])
-
-                                    elif connode.buildstorey == '1':
-                                        ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 1.2, '0.75'])
-                                else:
-                                    crit.append(['Percent', 80, 'DF', 2, '1'])
-                                    crit.append(['Ratio', 100, 'Uni', 0.7, '0.5'])
-                                    crit.append(['Min', 100, 'PDF', 1.4, '0.5'])
-                                    crit.append(['Percent', 100, 'Skyview', 1, '0.75'])
-
-                                    if connode.buildstorey == '0':
-                                        ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 2.8, '0.75'])
-
-                                    elif connode.buildstorey == '1':
-                                        ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 2.1, '0.75'])
-
-                            elif connode.bambuildmenu == '1':
-                                if not mat.gl_roof:
-                                    crit.append(['Percent', 80, 'DF', 2, '1'])
-#                                    crit.append(['Percent', 80, 'DF', 2, '1'])
-                                    crit.append(['Ratio', 100, 'Uni', 0.4, '0.5'])
-                                    crit.append(['Min', 100, 'PDF', 0.8, '0.5'])
-                                    crit.append(['Percent', 80, 'Skyview', 1, '0.75'])
-
-                                    if connode.buildstorey == '0':
-                                        ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 1.6, '0.75'])
-
-                                    elif connode.buildstorey == '1':
-                                        ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 1.2, '0.75'])
-                                else:
-                                    crit.append(['Percent', 80, 'DF', 2, '1'])
-#                                    crit.append(['Percent', 80, 'DF', 2, '1'])
-                                    crit.append(['Ratio', 100, 'Uni', 0.7, '0.5'])
-                                    crit.append(['Min', 100, 'PDF', 1.4, '0.5'])
-                                    crit.append(['Percent', 100, 'Skyview', 1, '0.75'])
-
-                                    if connode.buildstorey == '0':
-                                        ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 2.8, '0.75'])
-
-                                    elif connode.buildstorey == '1':
-                                        ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 2.1, '0.75'])
-
-                            elif connode.bambuildmenu == '2':
-                                if mat.hspacemenu == '0':
-                                    crit.append(['Percent', 80, 'DF', 2, '1'])
-#                                    crit.append(['Percent', 80, 'DF', 2, '1'])
-                                else:
-                                    crit.append(['Percent', 80, 'DF', 3, '2'])
-
-                                if connode.buildstorey == '0':
-                                    ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                    ecrit.append(['Min', 100, 'PDF', 1.6, '0.75'])
-
-                                elif connode.buildstorey == '1':
-                                    ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                    ecrit.append(['Min', 100, 'PDF', 1.2, '0.75'])
-
-                            elif connode.bambuildmenu == '3':
-                                if mat.rspacemenu == '0':
-                                    crit.append(['Percent', 80, 'DF', 2, '1'])
-                                    crit.append(['Percent', 100, 'Skyview', 1, '0.75'])
-
-                                    if connode.buildstorey == '0':
-                                        ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 1.6, '0.75'])
-
-                                    elif connode.buildstorey == '1':
-                                        ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 1.2, '0.75'])
-
-                                elif mat.rspacemenu == '1':
-                                    crit.append(['Percent', 80, 'DF', 1.5, '1'])
-                                    crit.append(['Percent', 100, 'Skyview', 1, '0.75'])
-
-                                    if connode.buildstorey == '0':
-                                        ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 1.6, '0.75'])
-
-                                    elif connode.buildstorey == '1':
-                                        ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                        ecrit.append(['Min', 100, 'PDF', 1.2, '0.75'])
-
-                                elif mat.rspacemenu == '2':
-                                    if not mat.gl_roof:
-                                        crit.append(['Percent', 80, 'DF', 2, '1'])
-                                        crit.append(['Ratio', 100, 'Uni', 0.4, '0.5'])
-                                        crit.append(['Min', 100, 'PDF', 0.8, '0.5'])
-                                        crit.append(['Percent', 80, 'Skyview', 1, '0.75'])
-
-                                        if connode.buildstorey == '0':
-                                            ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                            ecrit.append(['Min', 100, 'PDF', 1.6, '0.75'])
-
-                                        elif connode.buildstorey == '1':
-                                            ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                            ecrit.append(['Min', 100, 'PDF', 1.2, '0.75'])
-                                    else:
-                                        crit.append(['Percent', 80, 'DF', 2, '1'])
-                                        crit.append(['Ratio', 100, 'Uni', 0.7, '0.5'])
-                                        crit.append(['Min', 100, 'PDF', 1.4, '0.5'])
-                                        crit.append(['Percent', 100, 'Skyview', 1, '0.75'])
-
-                                        if connode.buildstorey == '0':
-                                            ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                            ecrit.append(['Min', 100, 'PDF', 2.8, '0.75'])
-
-                                        elif connode.buildstorey == '1':
-                                            ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                            ecrit.append(['Min', 100, 'PDF', 2.1, '0.75'])
-
-                            elif connode.bambuildmenu == '4':
-                                if mat.respacemenu == '0':
-                                    crit.append(['Percent', 35, 'PDF', 2, '1'])
-                                    ecrit.append(['Percent', 50, 'PDF', 2, '1'])
-
-                                if mat.respacemenu == '1':
-                                    if not mat.gl_roof:
-                                        crit.append(['Percent', 80, 'DF', 2, '1'])
-                                        crit.append(['Ratio', 100, 'Uni', 0.4, '0.5'])
-                                        crit.append(['Min', 100, 'PDF', 0.8, '0.5'])
-                                        crit.append(['Percent', 80, 'Skyview', 1, '0.75'])
-
-                                        if connode.buildstorey == '0':
-                                            ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                            ecrit.append(['Min', 100, 'PDF', 1.6, '0.75'])
-
-                                        elif connode.buildstorey == '1':
-                                            ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                            ecrit.append(['Min', 100, 'PDF', 1.2, '0.75'])
-                                    else:
-                                        crit.append(['Percent', 80, 'DF', 2, '1'])
-                                        crit.append(['Ratio', 100, 'Uni', 0.7, '0.5'])
-                                        crit.append(['Min', 100, 'PDF', 1.4, '0.5'])
-                                        crit.append(['Percent', 100, 'Skyview', 1, '0.75'])
-
-                                        if connode.buildstorey == '0':
-                                            ecrit.append(['Percent', 80, 'DF', 4, '1'])
-                                            ecrit.append(['Min', 100, 'PDF', 2.8, '0.75'])
-
-                                        elif connode.buildstorey == '1':
-                                            ecrit.append(['Percent', 80, 'DF', 3, '1'])
-                                            ecrit.append(['Min', 100, 'PDF', 2.1, '0.75'])
-
-                        elif connode.analysismenu == '1':
-                            if mat.rspacemenu == '0':
-                                crit.append(['Average', 100, 'DF', 2, '1'])
-                                crit.append(['Percent', 80, 'Skyview', 1, '0.75'])
-                            elif mat.rspacemenu == '1':
-                                crit.append(['Average', 100, 'DF', 1.5, '1'])
-                                crit.append(['Percent', 80, 'Skyview', 1, '0.75'])
-
-                        elif connode.analysismenu == '2':
-                            crit.append(['Percent', 75, 'FC', 108, '1'])
-                            crit.append(['Percent', 75, 'FC', 5400, '1'])
-                            crit.append(['Percent', 90, 'FC', 108, '1'])
-                            crit.append(['Percent', 90, 'FC', 5400, '1'])
-
-                    for c in crit:
-                        if c[0] == 'Percent':
-                            if c[2] == 'DF':
-                                dfpass[frame] = 1
-                                if sum(res[frame][fstart:fend])/(fend - fstart) > c[3]:
-                                    dfpassarea += geoarea
-                                    comps[frame].append(1)
-                                else:
-                                    comps[frame].append(0)
-                                comps[frame].append(sum(res[frame][fstart:fend])/(fend - fstart))
-                                dftotarea += geoarea
-                                
-                            if c[2] == 'PDF':
-                                dfpass[frame] = 1
-                                for fa, face in enumerate(geofaces):
-                                    if res[frame][fa + fstart] > c[3]:
-                                        dfpassarea += vi_func.triarea(geo, face)
-                                if dfpassarea > c[1]*geoarea/100:
-                                    comps[frame].append(1)
-                                else:
-                                    comps[frame].append(0)
-                                comps[frame].append(100*dfpassarea/geoarea)
-                                dftotarea += geoarea
-                                    
-#                                if sum(res[frame][fstart:fend])/(fend - fstart) > c[3]:
-#                                    dfpassarea += geoarea
-#                                    comps[frame].append(1)
-#                                else:
-#                                    comps[frame].append(0)
-#                                comps[frame].append(sum(res[frame][fstart:fend])/(fend - fstart))
-#                                dftotarea += geoarea
-
-                            elif c[2] == 'Skyview':
-                                for fa, face in enumerate(geofaces):
-                                   if svres[frame][fa + fstart] > 0:
-                                        passarea += vi_func.triarea(geo, face)
-                                if passarea >= c[1]*geoarea/100:
-                                    comps[frame].append(1)
-                                else:
-                                    comps[frame].append(0)
-                                comps[frame].append(100*passarea/geoarea)
-                                passarea = 0
-
-                        elif c[0] == 'Min':
-                            if min(res[frame][fstart:fend]) > c[3]:
-                                comps[frame].append(1)
-                            else:
-                                comps[frame].append(0)
-                            comps[frame].append(min(res[frame][fstart:fend]))
-
-                        elif c[0] == 'Ratio':
-                            if min(res[frame][fstart:fend])/(sum(res[frame][fstart:fend])/(fend - fstart)) >= c[3]:
-                                comps[frame].append(1)
-                            else:
-                                comps[frame].append(0)
-                            comps[frame].append(min(res[frame][fstart:fend])/(sum(res[frame])/(fend - fstart)))
-
-                        elif c[0] == 'Average':
-                            if sum([vi_func.triarea(geo, face) * res[frame][fa+fstart] for fa, face in enumerate(geofaces)])/geoarea > c[3]:
-                                comps[frame].append(1)
-                            else:
-                                comps[frame].append(0)
-                            comps[frame].append(sum([vi_func.triarea(geo, face) * res[frame][fa+fstart] for fa, face in enumerate(geofaces)])/geoarea)
-
-                    for e in ecrit:
-                        if e[0] == 'Percent':
-                            if e[2] == 'DF':
-                                edfpass[frame] = 1
-                                if sum(res[frame][fstart:fend])/(fend - fstart) > e[3]:
-                                    edfpassarea += geoarea
-                                ecomps[frame].append((0, 1)[sum(res[frame][fstart:fend])/(fend - fstart) > e[3]])
-                                ecomps[frame].append(sum(res[frame][fstart:fend])/(fend - fstart))
-                                edftotarea += geoarea
-                                
-                            if e[2] == 'PDF':
-                                edfpass[frame] = 1
-                                for fa, face in enumerate(geofaces):
-                                    if res[frame][fa + fstart] > e[3]:
-                                        edfpassarea += vi_func.triarea(geo, face)
-                                if dfpassarea > e[1]*geoarea/100:
-                                    ecomps[frame].append(1)
-                                else:
-                                    ecomps[frame].append(0)
-                                ecomps[frame].append(100*edfpassarea/geoarea)
-                                edftotarea += geoarea
-
-                            elif e[2] == 'Skyview':
-                                for fa, face in enumerate(geofaces):
-                                    if svres[frame][fa] > 0:
-                                        passarea += vi_func.triarea(geo, face)
-
-                                if passarea >= e[1] * geoarea/100:
-                                    ecomps[frame].append(1)
-                                else:
-                                    ecomps[frame].append(0)
-                                ecomps[frame].append(100*passarea/geoarea)
-                                passarea = 0
-
-                        elif e[0] == 'Min':
-                            if min(res[frame][fstart:fend]) > e[3]:
-                                ecomps[frame].append(1)
-                            else:
-                                ecomps[frame].append(0)
-                            ecomps[frame].append(min(res[frame][fstart:fend]))
-
-                        elif e[0] == 'Ratio':
-                            if min(res[frame][fstart:fend])/(sum(res[frame][fstart:fend])/(fend - fstart)) >= e[3]:
-                                ecomps[frame].append(1)
-                            else:
-                                ecomps[frame].append(0)
-                            ecomps[frame].append(min(res[frame][fstart:fend])/(sum(res[frame][fstart:fend])/(fend - fstart)))
-
-                        elif e[0] == 'Average':
-                            if sum(res[frame][fstart:fend])/(fend - fstart) > e[3]:
-                                ecomps[frame].append(1)
-                            else:
-                                ecomps[frame].append(0)
-                            ecomps[frame].append(sum(res[frame][fstart:fend])/(fend - fstart))
-
-                    geo['crit'] = [[c[0], str(c[1]), c[2], str(c[3]), c[4]] for c in crit[:]]
-                    geo['ecrit'] = [[c[0], str(c[1]), c[2], str(c[3]), c[4]] for c in ecrit[:]]
-                    geo['comps'] = comps
-                    geo['ecomps'] = ecomps
-                    crits.append(geo['crit'])
-                    fstart = fend
-    
-        if connode.bl_label == 'LiVi Compliance': 
-            if dfpass[frame] == 1:
-                dfpass[frame] = 2 if dfpassarea/dftotarea >= (0.8, 0.35)[connode.analysismenu == '0' and connode.bambuildtype == '4'] else dfpass[frame]
-            if edfpass[frame] == 1:
-                edfpass[frame] = 2 if edfpassarea/edftotarea >= (0.8, 0.5)[connode.analysismenu == '0' and connode.bambuildtype == '4'] else edfpass[frame]
-            scene['crits'] = crits
-            scene['dfpass'] = dfpass
-        simnode.outputs['Data out'].hide = True
-    else:
-        for fr, frame in enumerate(range(scene.fs, scene.fe + 1)):
-            scene.frame_set(frame)
-            sof, eof = 0, 0
-            for geo in vi_func.retobjs('livic'):
-                bpy.ops.object.select_all(action = 'DESELECT')
-                scene.objects.active = None
-                geoarea = sum([vi_func.triarea(geo, face) for face in geo.data.polygons if geo.data.materials[face.material_index].livi_sense])
-                geofaces = [face for face in geo.data.polygons if geo.data.materials[face.material_index].livi_sense]
-                geo['wattres'] = {str(frame):[0 for x in range(len(res[0]))]}
-                faceareas = [vi_func.triarea(geo, fa) for fa in geofaces[sof:eof+len(geofaces)]]
-                for i in range(len(res[0])):
-                    geo['wattres'][str(frame)][i] = sum([res[fr][i][sof:eof+len(geofaces)][j] * faceareas[j] for j in range(sof, eof+len(geofaces))])
-                sof = len(geofaces)
-                eof += len(geofaces)
-        simnode.outputs['Data out'].hide = False
-            
-    calc_op.report({'INFO'}, "Calculation is finished.")
-    bpy.ops.wm.save_mainfile(check_existing = False)
-
-def li_glare(calc_op, simnode, connode, geonode):
-    scene = bpy.context.scene
-    cam = scene.camera
-    if cam:
-#        num = (("-ab", 2, 3, 5), ("-ad", 512, 2048, 4096), ("-ar", 128, 512, 1024), ("-as", 256, 1024, 2048), ("-aa", 0.3, 0.2, 0.18), ("-dj", 0, 0.7, 1), ("-ds", 0, 0.5, 0.15), ("-dr", 1, 2, 3), ("-ss", 0, 2, 5), ("-st", 1, 0.75, 0.1), ("-lw", 0.05, 0.001, 0.0002))
-#        params = (" {0[0]} {1[0]} {0[1]} {1[1]} {0[2]} {1[2]} {0[3]} {1[3]} {0[4]} {1[4]} {0[5]} {1[5]} {0[6]} {1[6]} {0[7]} {1[7]} {0[8]} {1[8]} {0[9]} {1[9]} {0[10]} {1[10]} ".format([n[0] for n in num], [n[int(simnode.simacc)+1] for n in num]))
-        
-        for frame in range(scene.fs, scene.fe + 1):
-            time = datetime.datetime(2014, 1, 1, connode.shour, 0) + datetime.timedelta(connode.sdoy - 1) if connode.animmenu == '0' else \
-            datetime.datetime(2014, 1, 1, int(connode.shour), int(60*(connode.shour - int(connode.shour)))) + datetime.timedelta(connode.sdoy - 1) + datetime.timedelta(hours = int(connode.interval*(frame-scene.frame_start)), seconds = int(60*(connode.interval*(frame-scene.frame_start) - int(connode.interval*(frame-scene.frame_start)))))
-            glarecmd = "rpict -w -vth -vh 180 -vv 180 -x 800 -y 800 -vd {0[0][2]} {0[1][2]} {0[2][2]} -vp {1[0]} {1[1]} {1[2]} {2} {3}-{5}.oct | evalglare -c {4}.hdr".format(-1*cam.matrix_world, cam.location, simnode['radparams'], geonode.filebase, os.path.join(geonode.newdir, 'glare'+str(frame)), frame)               
-            glarerun = Popen(glarecmd, shell = True, stdout = PIPE)
-            glaretf = open(geonode.filebase+".glare", "w")
-            for line in glarerun.stdout:
-                if line.decode().split(",")[0] == 'dgp':
-                    glaretext = line.decode().replace(',', ' ').replace("#INF", "").split(' ')                    
-                    glaretf.write("{0:0>2d}/{1:0>2d} {2:0>2d}:{3:0>2d}\ndgp: {4:.3f}\ndgi: {5:.3f}\nugr: {6:.3f}\nvcp: {7:.3f}\ncgi: {8:.3f}\nLveil: {9:.3f}\n".format(time.day, time.month, time.hour, time.minute, *[float(x) for x in glaretext[6:12]]))
-                    glaretf.close()
-            subprocess.call("pcond -u 300 {0}.hdr > {0}.temphdr".format(os.path.join(geonode.newdir, 'glare'+str(frame))), shell=True)
-            subprocess.call("{0} {1}.glare | psign -h 32 -cb 0 0 0 -cf 40 40 40 | pcompos {3}.temphdr 0 0 - 800 550 > {3}.hdr" .format(geonode.cat, geonode.filebase, frame, os.path.join(geonode.newdir, 'glare'+str(frame))), shell=True)
-            subprocess.call("{} {}.temphdr".format(geonode.rm, os.path.join(geonode.newdir, 'glare'+str(frame))), shell=True)                    
-            if  'glare{}.hdr'.format(frame) in bpy.data.images:
-                bpy.data.images['glare{}.hdr'.format(frame)].reload()
+                rtcmds.append("rtrace -n {0} -w {1} -ap {2}-{3}.gpm 50 {4} -faa -h -ov -I {2}-{3}.oct".format(scene['viparams']['nproc'], simnode['radparams'], scene['viparams']['filebase'], frame, cpfileentry)) #+" | tee "+lexport.newdir+lexport.fold+self.simlistn[int(lexport.metric)]+"-"+str(frame)+".res"
             else:
-                bpy.data.images.load(os.path.join(geonode.newdir, 'glare{}.hdr'.format(frame)))
+#                if context == 'Compliance':
+#                    rtcmds.append("rcontrib -w -n {} {} -m sky_glow -I+ -V+ {}-{}.oct ".format(scene['viparams']['nproc'], simnode['radparams'], scene['viparams']['filebase'], frame))    
+#
+#                else:
+                rtcmds.append("rtrace -n {0} -w {1} -faa -h -ov -I {2}-{3}.oct".format(scene['viparams']['nproc'], simnode['radparams'], scene['viparams']['filebase'], frame)) #+" | tee "+lexport.newdir+lexport.fold+self.simlistn[int(lexport.metric)]+"-"+str(frame)+".res"
+        else:
+            rccmds.append("rcontrib -w  -h -I -fo -bn 146 {} -n {} -f tregenza.cal -b tbin -m sky_glow {}-{}.oct".format(simnode['radparams'], scene['viparams']['nproc'], scene['viparams']['filebase'], frame))
+#            rccmds.append("rcontrib -w  -h -I- -fo -bn 146 {} -n {} -f tregenza.cal -b tbin -m env_glow {}-{}.oct".format(simnode['radparams'], scene['viparams']['nproc'], scene['viparams']['filebase'], frame))
+
+    try:
+        tpoints = [bpy.data.objects[lc]['rtpnum'] for lc in scene['liparams']['livic']]
+    except:
+        calc_op.report({'ERROR'}, 'Re-export the LiVi geometry')
+        return
+        
+    calcsteps = sum(tpoints) * len(frames)
+    pfile = progressfile(scene, datetime.datetime.now(), calcsteps)
+    kivyrun = progressbar(os.path.join(scene['viparams']['newdir'], 'viprogress'))
+    reslists = []
+    obs = [scene.objects[on] for on in scene['liparams']['livic']]
+
+    for oi, o in enumerate(obs):
+        curres = sum(tpoints[:oi])
+        selobj(scene, o)
+        o['omax'], o['omin'], o['oave'], totsensearea, totsdaarea, totasearea  = {}, {}, {}, 0, 0, 0
+        if context == 'Basic':
+            bccout = o.basiccalcapply(scene, frames, rtcmds, simnode, curres, pfile)
+            if bccout == 'CANCELLED':
+                return 'CANCELLED'
+            else:
+                reslists += bccout
                 
-    else:
-        calc_op.report({'ERROR'}, "There is no camera in the scene. Create one for glare analysis")
+        elif context == 'CBDM' and subcontext == '0':
+            lhout = o.lhcalcapply(scene, frames, rtcmds, simnode, curres, pfile)
+            if lhout  == 'CANCELLED':
+                return 'CANCELLED'
+            else:
+                reslists += lhout
+        
+        elif (context == 'CBDM' and subcontext in ('1', '2')) or (context == 'Compliance' and subcontext == '3'):
+            udiout = o.udidacalcapply(scene, frames, rccmds, simnode, curres, pfile)
+            if udiout == 'CANCELLED':
+                return 'CANCELLED'
+            else:
+                reslists += udiout[2]
+                pfs.append(udiout[0])
+                epfs.append(udiout[1])
+
+        elif context == 'Compliance':
+            compout = o.compcalcapply(scene, frames, rtcmds, simnode, curres, pfile)  
+            if compout == 'CANCELLED':
+                return 'CANCELLED'
+            else:
+                reslists += compout[2]
+                pfs.append(compout[0])
+                epfs.append(compout[1])
+                
+    for f, frame in enumerate(frames):
+        if context == 'Compliance':
+            tpf = 'FAIL' if 'FAIL' in pfs[f] or 'FAIL*' in pfs[f] else 'PASS'
+            if simnode['coptions']['canalysis'] == '0': 
+                tpf = 'EXEMPLARY' if tpf == 'PASS' and ('FAIL' not in epfs[f] and 'FAIL*' not in epfs[f]) else tpf
+                cred = '0' if tpf == 'FAIL' else ('1', '2', '2', '1', '1', '1')[int(simnode['coptions']['buildtype'])]
+                ecred = '1' if tpf == 'EXEMPLARY' else '0'
+                simnode['tablecomp{}'.format(frame)] = [['Standard: BREEAM HEA1'], 
+                        ['Build type: {}'.format(builddict[simnode['coptions']['canalysis']][int(simnode['coptions']['buildtype'])])], [''], ['Standard credits: ' + cred], 
+                         ['Exemplary credits: '+ ecred]]
+                for o in obs:
+                    o['tablecomp{}'.format(frame)] += [['', '', '', ''], ['Build type: {}'.format(builddict[simnode['coptions']['canalysis']][int(simnode['coptions']['buildtype'])]), 'Standard credits: ' + cred, 'Exemplary credits: '+ ecred, '']]
+            
+            elif simnode['coptions']['canalysis'] == '1':
+                cfshcred = 0
+                for pf in pfs[f]:
+                    for stype in [0, 1, 2]:
+                        if all([p[1] == 'Pass' for p in pf if p[0] == stype]) and [p for p in pf if p[0] == stype]:
+                            cfshcred += 1
+                simnode['tablecomp{}'.format(frame)] = [['Standard: CfSH'], 
+                        ['Build type: Residential'], [''], ['Standard credits: {}'.format(cfshcred)]]
+                for o in obs:
+                    o['tablecomp{}'.format(frame)] += [['', '', '', ''], ['Build type: Residential', 'Standard credits: {}'.format(cfshcred), '', '']]
+            
+            elif simnode['coptions']['canalysis'] == '2':
+                gscred = max(len(p) for p in pfs[f]) - max([sum([(0, 1)[p == 'Fail'] for p in pf]) for pf in pfs[f]])
+                simnode['tablecomp{}'.format(frame)] = [['Standard: Green Star'], 
+                            ['Build type: {}'.format(builddict[simnode['coptions']['canalysis']][int(simnode['coptions']['buildtype'])])], [''], ['Standard credits: {}'.format(gscred)]]
+                for o in obs:
+                    o['tablecomp{}'.format(frame)] += [['', '', '', ''], ['Build type: {}'.format(builddict[simnode['coptions']['canalysis']]), 'Standard credits: {}'.format(gscred), '', '']]
+            
+            elif simnode['coptions']['canalysis'] == '3':
+                cred = 0
+                for z in list(zip(pfs[f], epfs[f])):
+                    if all([pf == 'Pass' for pf in z[:-1]]):
+                        cred += int(z[-1])
+                simnode['tablecomp{}'.format(frame)] = [['Standard: LEEDv4'], 
+                        ['Build type: {}'.format(builddict[simnode['coptions']['canalysis']][int(simnode['coptions']['buildtype'])])], [''], ['Credits: {}'.format(cred)]]
+                for o in obs:
+                    o['tablecomp{}'.format(frame)] += [['', '', '', ''], ['Build type: {}'.format(builddict[simnode['coptions']['canalysis']][int(simnode['coptions']['buildtype'])]), 'Credits: {}'.format(cred), '', '']]
+            
+    if kivyrun.poll() is None:
+        kivyrun.kill()
+        
+    return reslists
+            
+
