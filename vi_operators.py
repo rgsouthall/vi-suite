@@ -595,12 +595,13 @@ class IES_Select(bpy.types.Operator, io_utils.ImportHelper):
 
     def execute(self, context):
         lamp = bpy.context.active_object
-        if " " not in self.filepath:
-            lamp['ies_name'] = self.filepath
-            return {'FINISHED'}
-        else:
-            self.report({'ERROR'}, "There is a space either in the IES filename or directory location. Rename or move the file.")
-            return {'CANCELLED'}
+#        if " " not in self.filepath:
+        lamp['ies_name'] = self.filepath
+        return {'FINISHED'}
+#        else:
+#            self.report({'ERROR'}, "There is a space either in the IES filename or directory location. Rename or move the file.")
+#            lamp['ies_name'] = self.filepath
+#            return {'CANCELLED'}
 
     def invoke(self,context,event):
         context.window_manager.fileselect_add(self)
